@@ -61,6 +61,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-virtual": "^3.14.9",
+    "@visx/xychart": "^4.0.0",
     "@xyflow/react": "^12.11.2",
     "axios": "^1.16.1",
     "class-transformer": "^0.5.1",

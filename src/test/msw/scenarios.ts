@@ -4,6 +4,12 @@ import {
   createApiSuccess,
   dummyAuditLogs,
   dummyDashboardSummary,
+  dummyDashboardActiveUsers,
+  dummyDashboardConversionSeries,
+  dummyDashboardKpi,
+  dummyDashboardSeries,
+  dummyDashboardTable,
+  emptyDashboardWidgetData,
   dummyNotifications,
   dummySession,
   dummyUsers,
@@ -64,6 +70,39 @@ export const apiScenarios = {
     return HttpResponse.json(createApiSuccess(user));
   }),
   dashboardSummary: http.get('/api/dashboard/summary', () => HttpResponse.json(createApiSuccess(dummyDashboardSummary))),
+  dashboardKpi: http.get('/api/dashboard/kpi', ({ request }) => {
+    const metric = new URL(request.url).searchParams.get('metric');
+    return HttpResponse.json(createApiSuccess(metric === 'active-users' ? dummyDashboardActiveUsers : dummyDashboardKpi));
+  }),
+  dashboardChart: http.get('/api/dashboard/chart', ({ request }) => {
+    const metric = new URL(request.url).searchParams.get('metric');
+    return HttpResponse.json(
+      createApiSuccess(metric === 'conversion' ? dummyDashboardConversionSeries : dummyDashboardSeries),
+    );
+  }),
+  dashboardTable: http.get('/api/dashboard/table', () => HttpResponse.json(createApiSuccess(dummyDashboardTable))),
+  dashboardKpiEmpty: http.get('/api/dashboard/kpi', () => HttpResponse.json(createApiSuccess(emptyDashboardWidgetData.kpi))),
+  dashboardChartEmpty: http.get('/api/dashboard/chart', () => HttpResponse.json(createApiSuccess(emptyDashboardWidgetData.series))),
+  dashboardTableEmpty: http.get('/api/dashboard/table', () => HttpResponse.json(createApiSuccess(emptyDashboardWidgetData.table))),
+  dashboardDataDelayed: [
+    http.get('/api/dashboard/kpi', async () => {
+      await delay(1_000);
+      return HttpResponse.json(createApiSuccess(dummyDashboardKpi));
+    }),
+    http.get('/api/dashboard/chart', async () => {
+      await delay(1_000);
+      return HttpResponse.json(createApiSuccess(dummyDashboardSeries));
+    }),
+    http.get('/api/dashboard/table', async () => {
+      await delay(1_000);
+      return HttpResponse.json(createApiSuccess(dummyDashboardTable));
+    }),
+  ],
+  dashboardDataError: [
+    http.get('/api/dashboard/kpi', () => HttpResponse.json(createApiError('DASHBOARD_UNAVAILABLE', 'Dashboard data is unavailable.'), { status: 503 })),
+    http.get('/api/dashboard/chart', () => HttpResponse.json(createApiError('DASHBOARD_UNAVAILABLE', 'Dashboard data is unavailable.'), { status: 503 })),
+    http.get('/api/dashboard/table', () => HttpResponse.json(createApiError('DASHBOARD_UNAVAILABLE', 'Dashboard data is unavailable.'), { status: 503 })),
+  ],
   notifications: http.get('/api/notifications', () =>
     HttpResponse.json(
       createApiSuccess({
@@ -93,6 +132,9 @@ export const defaultHandlers = [
   apiScenarios.usersSuccess,
   apiScenarios.userById,
   apiScenarios.dashboardSummary,
+  apiScenarios.dashboardKpi,
+  apiScenarios.dashboardChart,
+  apiScenarios.dashboardTable,
   apiScenarios.notifications,
   apiScenarios.auditLogs,
   apiScenarios.health,

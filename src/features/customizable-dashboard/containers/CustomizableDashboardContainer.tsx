@@ -1,48 +1,74 @@
-import { useCallback, useState } from 'react';
-import type { Layout } from 'react-grid-layout';
-import type { DashboardWidget } from '../model/dashboardWidget';
+import { useMemo } from 'react';
+import { createDashboardEventBus } from '../events/dashboardEventBus';
+import { DashboardRuntimeProvider } from '../events/DashboardRuntimeProvider';
+import { useDashboardBuilder } from '../hooks/useDashboardBuilder';
+import { initialDashboard as defaultDashboard } from '../model/initialDashboard';
+import type { Dashboard } from '../model/dashboardWidget';
+import {
+  createLocalStorageDashboardRepository,
+  type DashboardRepository,
+} from '../persistence/dashboardRepository';
 import { CustomizableDashboardView } from '../views/CustomizableDashboardView';
+import { createDashboardActionGate, type DashboardRole } from '../permissions/dashboardPermissions';
+import { exportDashboard } from '../model/dashboardSerialization';
+import { defaultWidgetRegistry, type WidgetRegistry } from '../widgets/widgetRegistry';
 
-const initialWidgets: DashboardWidget[] = [
-  {
-    id: 'monthly-revenue',
-    type: 'kpi',
-    position: { x: 0, y: 0 },
-    width: 4,
-    height: 3,
-    config: { title: 'Monthly revenue', value: '$48,240', change: '+12.4% from last month' },
-  },
-  {
-    id: 'revenue-trend',
-    type: 'placeholder-chart',
-    position: { x: 4, y: 0 },
-    width: 8,
-    height: 5,
-    config: { title: 'Revenue trend', description: 'Chart integration will be added in a later step.' },
-  },
-];
+type CustomizableDashboardContainerProps = {
+  initialDashboard?: Dashboard;
+  initiallyEditing?: boolean;
+  repository?: DashboardRepository;
+  role?: DashboardRole;
+  registry?: WidgetRegistry;
+  showPerformanceDebug?: boolean;
+};
 
-export default function CustomizableDashboardContainer() {
-  const [widgets, setWidgets] = useState(initialWidgets);
+export default function CustomizableDashboardContainer({
+  initialDashboard = defaultDashboard,
+  initiallyEditing = false,
+  repository: providedRepository,
+  role = 'owner',
+  registry = defaultWidgetRegistry,
+  showPerformanceDebug = false,
+}: CustomizableDashboardContainerProps) {
+  const repository = useMemo(
+    () => providedRepository ?? createLocalStorageDashboardRepository(window.localStorage),
+    [providedRepository],
+  );
+  const eventBus = useMemo(() => createDashboardEventBus(), []);
+  const actionGate = useMemo(() => createDashboardActionGate(role), [role]);
+  const builder = useDashboardBuilder({ initialDashboard, initiallyEditing, repository, eventBus, actionGate, registry });
 
-  const handleLayoutChange = useCallback((layout: Layout) => {
-    const layoutById = new Map(layout.map((item) => [item.i, item]));
-
-    setWidgets((currentWidgets) =>
-      currentWidgets.map((widget) => {
-        const item = layoutById.get(widget.id);
-        return item
-          ? {
-              ...widget,
-              position: { x: item.x, y: item.y },
-              width: item.w,
-              height: item.h,
-            }
-          : widget;
-      }),
-    );
-  }, []);
-
-  return <CustomizableDashboardView onLayoutChange={handleLayoutChange} widgets={widgets} />;
+  return (
+    <DashboardRuntimeProvider dashboard={builder.dashboard} eventBus={eventBus}>
+      <CustomizableDashboardView
+      dashboard={builder.dashboard}
+      registry={registry}
+      showPerformanceDebug={showPerformanceDebug}
+      permissions={{
+        canEdit: actionGate.can('edit'),
+        canExport: actionGate.can('export'),
+        canImport: actionGate.can('import'),
+      }}
+      eventBus={eventBus}
+      canRedo={builder.canRedo}
+      canUndo={builder.canUndo}
+      importError={builder.importError}
+      isEditing={builder.isEditing}
+      isSaving={builder.isSaving}
+      onAddWidget={builder.addWidget}
+      onCancel={builder.cancel}
+      onDeleteWidget={builder.deleteWidget}
+      onEdit={builder.enterEditMode}
+      onLayoutChange={builder.updateLayout}
+      onSave={builder.save}
+      onWidgetChange={builder.updateWidget}
+      onImport={builder.importJson}
+      onExport={() => actionGate.execute('export', () => exportDashboard(builder.dashboard))}
+      onRedo={builder.redo}
+      onUndo={builder.undo}
+      selectedWidgetId={builder.selectedWidgetId}
+      saveError={builder.saveError}
+      />
+    </DashboardRuntimeProvider>
+  );
 }
-
