@@ -37,6 +37,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
+          if (
+            id.includes('node_modules/react-grid-layout') ||
+            id.includes('node_modules/react-draggable') ||
+            id.includes('node_modules/react-resizable')
+          ) {
+            return 'dashboard-grid';
+          }
           if (id.includes('node_modules/react') || id.includes('react-router-dom')) {
             return 'react';
           }

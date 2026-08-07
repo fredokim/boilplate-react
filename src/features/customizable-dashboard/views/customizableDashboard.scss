@@ -1,0 +1,42 @@
+.dashboard-grid-container {
+  min-height: 420px;
+  margin: 0 -16px;
+}
+
+.dashboard-widget {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: white;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
+}
+
+.dashboard-widget__handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: move;
+  user-select: none;
+}
+
+.dashboard-widget__content {
+  height: calc(100% - 36px);
+  padding: 16px;
+}
+
+.react-grid-item.react-grid-placeholder {
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  opacity: 0.14;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  border-color: var(--color-muted);
+}
+
