@@ -2,6 +2,7 @@ import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Ed
 import '@xyflow/react/dist/style.css';
 import type { GraphDocument, GraphMetadata, GraphNodePresentationResolver } from '../model/graph';
 import { GraphNodeCard, type GraphFlowNode } from './GraphNodeCard';
+import type { EdgeRuntimeState, NodeRuntimeState, NodeRuntimeStatus } from '../realtime/types';
 import './graphCanvas.scss';
 
 const nodeTypes = { 'graph-node': GraphNodeCard } satisfies NodeTypes;
@@ -15,13 +16,17 @@ type GraphCanvasProps<
   selectedNodeId: string | null;
   getNodePresentation: GraphNodePresentationResolver<TNodeType>;
   onNodeSelect: (nodeId: string | null) => void;
+  nodeRuntime: Readonly<Record<string, NodeRuntimeState>>;
+  edgeRuntime: Readonly<Record<string, EdgeRuntimeState>>;
+  runtimeFilter: NodeRuntimeStatus | 'all';
+  isNodeStale: (nodeId: string) => boolean;
 };
 
 export function GraphCanvas<
   TNodeType extends string,
   TNodeMetadata extends GraphMetadata,
   TEdgeMetadata extends GraphMetadata,
->({ getNodePresentation, graph, onNodeSelect, selectedNodeId }: GraphCanvasProps<TNodeType, TNodeMetadata, TEdgeMetadata>) {
+>({ edgeRuntime, getNodePresentation, graph, isNodeStale, nodeRuntime, onNodeSelect, runtimeFilter, selectedNodeId }: GraphCanvasProps<TNodeType, TNodeMetadata, TEdgeMetadata>) {
   const routeNodeIds = new Set(graph.route?.routeNodeIds ?? []);
   const routeEdgeIds = new Set(graph.route?.routeEdgeIds ?? []);
   const nodes: GraphFlowNode[] = graph.nodes.map((node) => ({
@@ -33,18 +38,24 @@ export function GraphCanvas<
       label: node.label,
       presentation: getNodePresentation(node.type),
       routeHighlighted: routeNodeIds.has(node.id),
+      runtimeStatus: nodeRuntime[node.id]?.status ?? 'unknown',
+      stale: isNodeStale(node.id),
+      dimmed: runtimeFilter !== 'all' && nodeRuntime[node.id]?.status !== runtimeFilter,
     },
   }));
   const edges: Edge[] = graph.edges.map((edge) => {
     const routeHighlighted = routeEdgeIds.has(edge.id);
+    const runtime = edgeRuntime[edge.id];
+    const runtimeColor = runtime?.status === 'disconnected' ? '#64748b' : runtime?.status === 'degraded' ? '#d97706' : '#94a3b8';
+    const color = routeHighlighted ? '#2563eb' : runtimeColor;
     return {
       id: edge.id,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
       label: edge.label,
       animated: routeHighlighted,
-      markerEnd: { type: MarkerType.ArrowClosed, color: routeHighlighted ? '#2563eb' : '#94a3b8' },
-      style: { stroke: routeHighlighted ? '#2563eb' : '#94a3b8', strokeWidth: routeHighlighted ? 3 : 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color },
+      style: { stroke: color, strokeWidth: routeHighlighted ? 3 : 2, strokeDasharray: runtime?.status === 'disconnected' ? '6 4' : undefined },
     };
   });
 
