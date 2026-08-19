@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import type { Preview } from '@storybook/react-vite';
 import '../src/styles/tailwind.css';
 import '../src/styles/layout.scss';

@@ -21,6 +21,8 @@ import {
   createFailingDashboardRepository,
   createMemoryDashboardRepository,
 } from '../persistence/dashboardRepository';
+import { createDashboardPersonalization } from '../personalization/dashboardPersonalization';
+import { createMemoryDashboardPersonalizationRepository } from '../personalization/dashboardPersonalizationRepository';
 
 type DataScenario = 'loaded' | 'loading' | 'error' | 'empty' | 'table-1k' | 'table-10k';
 
@@ -117,6 +119,42 @@ function DashboardStory({ dashboard, initiallyEditing, registry, role, saveFails
           repository={repository}
           role={role}
           showPerformanceDebug={showPerformanceDebug}
+        />
+      </DashboardDataSourceRegistryProvider>
+    </QueryClientProvider>
+  );
+}
+
+function PersonalizationStory() {
+  const personalizationRepository = useMemo(() => {
+    const personalization = createDashboardPersonalization('story-user', initialDashboard.metadata.id, '2026-08-19T00:00:00.000Z');
+    personalization.presets.push({
+      id: 'apac-operations',
+      name: 'APAC operations',
+      createdAt: '2026-08-19T00:00:00.000Z',
+      updatedAt: '2026-08-19T00:00:00.000Z',
+      override: {
+        globalFilters: { region: 'apac' },
+        hiddenWidgetIds: ['recent-events'],
+        widgetOverrides: {},
+        addedWidgets: [],
+      },
+    });
+    return createMemoryDashboardPersonalizationRepository(personalization);
+  }, []);
+  const queryClient = useMemo(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } }),
+    [],
+  );
+  const dataSourceRegistry = useMemo(() => createStoryDataSourceRegistry('loaded'), []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DashboardDataSourceRegistryProvider registry={dataSourceRegistry}>
+        <CustomizableDashboardContainer
+          initialDashboard={initialDashboard}
+          personalizationRepository={personalizationRepository}
+          personalizationUserId="story-user"
         />
       </DashboardDataSourceRegistryProvider>
     </QueryClientProvider>
@@ -254,3 +292,4 @@ export const FiftyWidgetStress: Story = { args: { dashboard: createStressDashboa
 export const HundredWidgetStress: Story = { args: { dashboard: createStressDashboard(100), showPerformanceDebug: true } };
 export const ThousandRowVirtualizedTable: Story = { args: { dashboard: largeTableDashboard, scenario: 'table-1k', showPerformanceDebug: true } };
 export const LargeVirtualizedTable: Story = { args: { dashboard: largeTableDashboard, scenario: 'table-10k', showPerformanceDebug: true } };
+export const PersonalizedPresets: Story = { render: () => <PersonalizationStory /> };
