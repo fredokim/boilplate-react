@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../chat/model/chatMessage';
-import type { RealtimeConnectionState } from '../chat/realtime/realtimeChatAdapter';
+import type { ChatConnectionState, ChatDiagnostics } from '../chat/realtime/types';
 import { RealtimeChat } from '../chat/components/RealtimeChat';
 import type { VideoSource } from '../player/model/player';
 import { VideoPlayer } from '../player/components/VideoPlayer';
@@ -7,11 +7,17 @@ import './liveExperience.scss';
 
 type LiveExperienceViewProps = {
   chatMessages: readonly ChatMessage[];
-  connectionState: RealtimeConnectionState;
+  chatDiagnostics: ChatDiagnostics;
+  connectionState: ChatConnectionState;
   videoSource: VideoSource;
 };
 
-export function LiveExperienceView({ chatMessages, connectionState, videoSource }: LiveExperienceViewProps) {
+export function LiveExperienceView({
+  chatDiagnostics,
+  chatMessages,
+  connectionState,
+  videoSource,
+}: LiveExperienceViewProps) {
   return (
     <div className="page-grid">
       <div className="page-heading">
@@ -22,9 +28,8 @@ export function LiveExperienceView({ chatMessages, connectionState, videoSource 
       </div>
       <div className="live-experience">
         <VideoPlayer source={videoSource} title="Summer Stage · Live rehearsal" />
-        <RealtimeChat connectionState={connectionState} messages={chatMessages} />
+        <RealtimeChat connectionState={connectionState} diagnostics={chatDiagnostics} messages={chatMessages} />
       </div>
     </div>
   );
 }
-
