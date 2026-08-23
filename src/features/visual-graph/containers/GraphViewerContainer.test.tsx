@@ -28,12 +28,15 @@ vi.mock('../components/GraphCanvas', () => ({
 vi.mock('../realtime/useTopologyRealtime', () => ({
   useTopologyRealtime: () => ({
     connectionState: 'connected',
+    now: 0,
     runtime: {
-      nodes: new Map(), edges: new Map(), metricHistory: new Map(),
+      nodes: {}, edges: {}, version: 0,
       summary: { unknown: 0, healthy: 0, warning: 0, critical: 0, offline: 0 },
-      debug: { eventsReceived: 0, eventsApplied: 0, eventsCoalesced: 0, duplicateIgnored: 0, staleIgnored: 0, unknownEntityIgnored: 0, flushCount: 0, averageBatchSize: 0, bufferSize: 0, reconnectCount: 0, lastResyncAt: null },
+      diagnostics: { received: 0, applied: 0, coalesced: 0, duplicatesIgnored: 0, staleIgnored: 0, unknownEntities: 0, dropped: 0, flushCount: 0, totalBatchSize: 0, reconnectCount: 0, bufferSize: 0, lastResync: null },
     },
-    setMonitoredNode: vi.fn(),
+    isNodeStale: () => false,
+    selectedMetricHistory: {},
+    resync: vi.fn(),
   }),
 }));
 

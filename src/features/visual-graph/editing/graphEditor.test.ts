@@ -12,7 +12,7 @@ function requireDraft<T>(draft: T | null): T {
 
 const newNode: GraphNode<NetworkNodeType, NetworkNodeMetadata> = {
   id: 'router-new', type: 'router', label: 'New Router', position: { x: 10, y: 20 },
-  metadata: { hostname: 'router-new', ipAddress: 'Unassigned', status: 'healthy', location: 'Lab' },
+  metadata: { hostname: 'router-new', ipAddress: 'Unassigned', location: 'Lab' },
 };
 
 const newEdge: GraphEdge<NetworkEdgeMetadata> = {

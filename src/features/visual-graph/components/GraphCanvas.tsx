@@ -15,10 +15,9 @@ import type { GraphDocument, GraphMetadata, GraphNodePresentationResolver, Graph
 import type { GraphValidationError } from '../editing/graphValidation';
 import { getGraphEdgeVisualState, getGraphNodeVisualState, type GraphInteractionState } from '../model/graphInteraction';
 import { GraphNodeCard, type GraphFlowNode } from './GraphNodeCard';
+import type { EdgeRuntimeState, NodeRuntimeState, NodeRuntimeStatus } from '../realtime/types';
 import './graphCanvas.scss';
 import { createRouteLookup, getGraphDetailLevel } from '../performance/graphViewAdapter';
-import { isRuntimeStateStale } from '../realtime/runtimeState';
-import type { EdgeRuntimeState, NodeRuntimeState, NodeRuntimeStatus } from '../realtime/topologyRealtime';
 
 const nodeTypes = { 'graph-node': GraphNodeCard } satisfies NodeTypes;
 
@@ -41,10 +40,10 @@ type GraphCanvasProps<
   onCanvasClick?: (position: GraphPosition) => boolean;
   onMultiSelectionChange?: (nodeIds: readonly string[], edgeIds: readonly string[]) => void;
   onDebugChange?: (metrics: { renderCount: number; zoom: number }) => void;
-  nodeRuntime?: ReadonlyMap<string, NodeRuntimeState>;
-  edgeRuntime?: ReadonlyMap<string, EdgeRuntimeState>;
-  runtimeFilter?: 'all' | Exclude<NodeRuntimeStatus, 'healthy' | 'unknown'>;
-  runtimeNow?: number;
+  nodeRuntime?: Readonly<Record<string, NodeRuntimeState>>;
+  edgeRuntime?: Readonly<Record<string, EdgeRuntimeState>>;
+  runtimeFilter?: NodeRuntimeStatus | 'all';
+  isNodeStale?: (nodeId: string) => boolean;
 };
 
 export type GraphCanvasHandle = {
@@ -58,7 +57,7 @@ function GraphCanvasInner<
   TNodeMetadata extends GraphMetadata,
   TEdgeMetadata extends GraphMetadata,
 >(
-  { edgeRuntime, editable = false, getNodePresentation, graph, interaction, nodeRuntime, onCanvasClick, onConnect, onDebugChange, onEdgeHover, onEdgeSelect, onMultiSelectionChange, onNodeHover, onNodeMove, onNodeSelect, runtimeFilter = 'all', runtimeNow = 0, validationErrors = [] }: GraphCanvasProps<
+  { edgeRuntime, editable = false, getNodePresentation, graph, interaction, isNodeStale, nodeRuntime, onCanvasClick, onConnect, onDebugChange, onEdgeHover, onEdgeSelect, onMultiSelectionChange, onNodeHover, onNodeMove, onNodeSelect, runtimeFilter = 'all', validationErrors = [] }: GraphCanvasProps<
     TNodeType,
     TNodeMetadata,
     TEdgeMetadata
@@ -76,7 +75,7 @@ function GraphCanvasInner<
   const nodes = useMemo<GraphFlowNode[]>(
     () =>
       graph.nodes.map((node) => {
-        const runtimeState = nodeRuntime?.get(node.id);
+        const runtimeState = nodeRuntime?.[node.id];
         return ({
         id: node.id,
         type: 'graph-node',
@@ -90,17 +89,17 @@ function GraphCanvasInner<
           validationError: invalidNodeIds.has(node.id),
           detailLevel,
           ...(runtimeState ? { runtimeState } : {}),
-          runtimeStale: runtimeState ? isRuntimeStateStale(runtimeState, runtimeNow) : false,
+          runtimeStale: isNodeStale?.(node.id) ?? false,
           runtimeFiltered: runtimeFilter !== 'all' && runtimeState?.status !== runtimeFilter,
         },
       }); }),
-    [detailLevel, editable, getNodePresentation, graph.nodes, interaction, invalidNodeIds, nodeRuntime, routeLookup, runtimeFilter, runtimeNow],
+    [detailLevel, editable, getNodePresentation, graph.nodes, interaction, invalidNodeIds, isNodeStale, nodeRuntime, routeLookup, runtimeFilter],
   );
   const edges = useMemo<Edge[]>(
     () =>
       graph.edges.map((edge) => {
         const visualState = getGraphEdgeVisualState(edge.id, interaction, routeLookup);
-        const runtimeState = edgeRuntime?.get(edge.id);
+        const runtimeState = edgeRuntime?.[edge.id];
         const runtimeColor = runtimeState?.status === 'disconnected' ? '#dc2626' : runtimeState?.status === 'degraded' ? '#d97706' : '#94a3b8';
         const color = visualState.routeActive ? '#2563eb' : runtimeColor;
         return {
@@ -112,7 +111,7 @@ function GraphCanvasInner<
           selected: interaction.selection.edgeIds.includes(edge.id),
           className: [visualState.dimmed ? 'graph-edge--dimmed' : '', visualState.hovered ? 'graph-edge--hovered' : '', invalidEdgeIds.has(edge.id) ? 'graph-edge--error' : '', runtimeState ? `graph-edge--runtime-${runtimeState.status}` : ''].join(' '),
           markerEnd: { type: MarkerType.ArrowClosed, color },
-          style: { stroke: color, strokeWidth: visualState.routeActive || visualState.hovered ? 3 : 2 },
+          style: { stroke: color, strokeWidth: visualState.routeActive || visualState.hovered ? 3 : 2, strokeDasharray: runtimeState?.status === 'disconnected' ? '6 4' : undefined },
         };
       }),
     [detailLevel, edgeRuntime, graph.edges, interaction, invalidEdgeIds, routeLookup],

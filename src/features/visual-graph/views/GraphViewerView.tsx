@@ -6,7 +6,7 @@ import type { GraphDocument, GraphMetadata, GraphNodePresentationResolver } from
 import type { GraphInteractionState, GraphRouteQueryState } from '../model/graphInteraction';
 import { createGraphSearchIndex, searchGraphIndex } from '../performance/graphSearchIndex';
 import { GraphCanvas, type GraphCanvasHandle } from '../components/GraphCanvas';
-import type { NodeRuntimeStatus, TopologyConnectionState, TopologyRuntimeView } from '../realtime/topologyRealtime';
+import type { NodeRuntimeStatus, RealtimeConnectionState, RuntimeStoreSnapshot } from '../realtime/types';
 
 type GraphViewerViewProps<TNodeType extends string, TNodeMetadata extends GraphMetadata, TEdgeMetadata extends GraphMetadata> = {
   graph: GraphDocument<TNodeType, TNodeMetadata, TEdgeMetadata>;
@@ -21,8 +21,10 @@ type GraphViewerViewProps<TNodeType extends string, TNodeMetadata extends GraphM
   onRouteSearch: () => void;
   onRouteClear: () => void;
   onEdit: () => void;
-  connectionState: TopologyConnectionState;
-  runtime: TopologyRuntimeView;
+  connectionState: RealtimeConnectionState;
+  runtime: RuntimeStoreSnapshot;
+  isNodeStale: (nodeId: string, thresholdMs?: number) => boolean;
+  selectedMetricHistory: Record<string, number[]>;
 };
 
 function formatMetadataValue(value: unknown): string {
@@ -32,13 +34,12 @@ function formatMetadataValue(value: unknown): string {
 }
 
 export function GraphViewerView<TNodeType extends string, TNodeMetadata extends GraphMetadata, TEdgeMetadata extends GraphMetadata>({
-  connectionState, getNodePresentation, graph, interaction, onDestinationChange, onEdgeHover, onEdit, onNodeHover, onNodeSelect,
-  onRouteClear, onRouteSearch, onSourceChange, routeQuery, runtime,
+  connectionState, getNodePresentation, graph, interaction, isNodeStale, onDestinationChange, onEdgeHover, onEdit, onNodeHover, onNodeSelect,
+  onRouteClear, onRouteSearch, onSourceChange, routeQuery, runtime, selectedMetricHistory,
 }: GraphViewerViewProps<TNodeType, TNodeMetadata, TEdgeMetadata>) {
   const canvasRef = useRef<GraphCanvasHandle>(null);
   const [nodeQuery, setNodeQuery] = useState('');
   const [runtimeFilter, setRuntimeFilter] = useState<'all' | Exclude<NodeRuntimeStatus, 'healthy' | 'unknown'>>('all');
-  const [runtimeNow, setRuntimeNow] = useState(() => Date.now());
   const [rates, setRates] = useState({ received: 0, applied: 0 });
   const previousTotals = useRef({ received: 0, applied: 0 });
   const latestTotals = useRef({ received: 0, applied: 0 });
@@ -48,18 +49,18 @@ export function GraphViewerView<TNodeType extends string, TNodeMetadata extends 
   const selectedNode = graph.nodes.find((node) => node.id === interaction.selection.nodeIds[0]);
   const hoveredEdge = graph.edges.find((edge) => edge.id === interaction.hoveredEdgeId);
   const routeNodes = interaction.activeRoute?.nodeIds.map((id) => graph.nodes.find((node) => node.id === id)).filter(Boolean) ?? [];
-  const selectedRuntime = selectedNode ? runtime.nodes.get(selectedNode.id) : undefined;
+  const selectedRuntime = selectedNode ? runtime.nodes[selectedNode.id] : undefined;
+  const averageBatchSize = runtime.diagnostics.flushCount ? (runtime.diagnostics.totalBatchSize / runtime.diagnostics.flushCount).toFixed(1) : '0';
 
-  useEffect(() => { latestTotals.current = { received: runtime.debug.eventsReceived, applied: runtime.debug.eventsApplied }; }, [runtime.debug.eventsApplied, runtime.debug.eventsReceived]);
+  useEffect(() => { latestTotals.current = { received: runtime.diagnostics.received, applied: runtime.diagnostics.applied }; }, [runtime.diagnostics.applied, runtime.diagnostics.received]);
 
   useEffect(() => {
-    const staleTimer = setInterval(() => setRuntimeNow(Date.now()), 10_000);
     const rateTimer = setInterval(() => {
       const next = latestTotals.current;
       setRates({ received: next.received - previousTotals.current.received, applied: next.applied - previousTotals.current.applied });
       previousTotals.current = next;
     }, 1_000);
-    return () => { clearInterval(staleTimer); clearInterval(rateTimer); };
+    return () => { clearInterval(rateTimer); };
   }, []);
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export function GraphViewerView<TNodeType extends string, TNodeMetadata extends 
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <GraphCanvas edgeRuntime={runtime.edges} getNodePresentation={getNodePresentation} graph={graph} interaction={interaction} nodeRuntime={runtime.nodes} onEdgeHover={onEdgeHover} onNodeHover={onNodeHover} onNodeSelect={onNodeSelect} ref={canvasRef} runtimeFilter={runtimeFilter} runtimeNow={runtimeNow} />
+        <GraphCanvas edgeRuntime={runtime.edges} getNodePresentation={getNodePresentation} graph={graph} interaction={interaction} isNodeStale={isNodeStale} nodeRuntime={runtime.nodes} onEdgeHover={onEdgeHover} onNodeHover={onNodeHover} onNodeSelect={onNodeSelect} ref={canvasRef} runtimeFilter={runtimeFilter} />
         <div className="grid content-start gap-5">
           <Card title="Route detail" description="The ordered path returned by the route service.">
             {interaction.activeRoute ? (
@@ -155,7 +156,7 @@ export function GraphViewerView<TNodeType extends string, TNodeMetadata extends 
           </Card>
 
           <Card title="Node metadata" description="Selection remains independent from the active route.">
-            {selectedNode ? <><MetadataList entries={{ name: selectedNode.label, type: selectedNode.type, ...selectedNode.metadata, runtimeStatus: selectedRuntime?.status ?? 'unknown', lastUpdated: selectedRuntime ? new Date(selectedRuntime.lastUpdated).toLocaleTimeString() : '—', ...selectedRuntime?.metrics }} />{runtime.metricHistory.size ? <div className="mt-4 border-t border-line pt-3 text-xs text-muted">{[...runtime.metricHistory].map(([name, values]) => <p className="m-0 mt-1" key={name}><strong>{name}</strong>: {values.slice(-8).join(' → ')}</p>)}</div> : null}</> : <p className="m-0 text-sm text-muted">No node selected.</p>}
+            {selectedNode ? <><MetadataList entries={{ name: selectedNode.label, type: selectedNode.type, ...selectedNode.metadata, runtimeStatus: selectedRuntime?.status ?? 'unknown', lastUpdated: selectedRuntime ? new Date(selectedRuntime.lastUpdated).toLocaleTimeString() : '—', ...selectedRuntime?.metrics }} />{Object.keys(selectedMetricHistory).length ? <div className="mt-4 border-t border-line pt-3 text-xs text-muted">{Object.entries(selectedMetricHistory).map(([name, values]) => <p className="m-0 mt-1" key={name}><strong>{name}</strong>: {values.slice(-8).join(' → ')}</p>)}</div> : null}</> : <p className="m-0 text-sm text-muted">No node selected.</p>}
           </Card>
 
           <Card title="Edge metadata" description="Hover a connection to inspect it.">
@@ -163,7 +164,7 @@ export function GraphViewerView<TNodeType extends string, TNodeMetadata extends 
           </Card>
 
           <Card title="Realtime debug" description="Development telemetry for buffering, ordering, and reconnect behavior.">
-            <MetadataList entries={{ connectionState, eventsReceivedPerSecond: rates.received, eventsAppliedPerSecond: rates.applied, eventsReceived: runtime.debug.eventsReceived, eventsApplied: runtime.debug.eventsApplied, coalesced: runtime.debug.eventsCoalesced, duplicatesIgnored: runtime.debug.duplicateIgnored, staleIgnored: runtime.debug.staleIgnored, unknownEntityIgnored: runtime.debug.unknownEntityIgnored, bufferSize: runtime.debug.bufferSize, flushCount: runtime.debug.flushCount, averageBatchSize: runtime.debug.averageBatchSize.toFixed(1), runtimeStateCount: runtime.nodes.size + runtime.edges.size, reconnectCount: runtime.debug.reconnectCount, lastResync: runtime.debug.lastResyncAt ? new Date(runtime.debug.lastResyncAt).toLocaleTimeString() : '—' }} />
+            <MetadataList entries={{ connectionState, eventsReceivedPerSecond: rates.received, eventsAppliedPerSecond: rates.applied, eventsReceived: runtime.diagnostics.received, eventsApplied: runtime.diagnostics.applied, coalesced: runtime.diagnostics.coalesced, duplicatesIgnored: runtime.diagnostics.duplicatesIgnored, staleIgnored: runtime.diagnostics.staleIgnored, unknownEntityIgnored: runtime.diagnostics.unknownEntities, dropped: runtime.diagnostics.dropped, bufferSize: runtime.diagnostics.bufferSize, flushCount: runtime.diagnostics.flushCount, averageBatchSize: averageBatchSize, runtimeStateCount: Object.keys(runtime.nodes).length + Object.keys(runtime.edges).length, reconnectCount: runtime.diagnostics.reconnectCount, lastResync: runtime.diagnostics.lastResync ? new Date(runtime.diagnostics.lastResync).toLocaleTimeString() : '—' }} />
           </Card>
         </div>
       </div>

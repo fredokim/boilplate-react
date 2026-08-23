@@ -5,7 +5,6 @@ export type NetworkNodeType = 'router' | 'firewall' | 'server';
 export type NetworkNodeMetadata = {
   hostname: string;
   ipAddress: string;
-  status: 'healthy' | 'warning';
   location: string;
   description?: string;
 };
@@ -24,28 +23,28 @@ export const networkGraph: GraphDocument<NetworkNodeType, NetworkNodeMetadata, N
       type: 'router',
       label: 'Core Router',
       position: { x: 40, y: 150 },
-      metadata: { hostname: 'rt-core-01', ipAddress: '10.0.0.1', status: 'healthy', location: 'Seoul DC' },
+      metadata: { hostname: 'rt-core-01', ipAddress: '10.0.0.1', location: 'Seoul DC' },
     },
     {
       id: 'edge-firewall',
       type: 'firewall',
       label: 'Edge Firewall',
       position: { x: 330, y: 150 },
-      metadata: { hostname: 'fw-edge-01', ipAddress: '10.0.1.1', status: 'healthy', location: 'Seoul DC' },
+      metadata: { hostname: 'fw-edge-01', ipAddress: '10.0.1.1', location: 'Seoul DC' },
     },
     {
       id: 'api-server',
       type: 'server',
       label: 'API Server',
       position: { x: 650, y: 40 },
-      metadata: { hostname: 'api-prod-01', ipAddress: '10.0.2.21', status: 'healthy', location: 'Zone A' },
+      metadata: { hostname: 'api-prod-01', ipAddress: '10.0.2.21', location: 'Zone A' },
     },
     {
       id: 'worker-server',
       type: 'server',
       label: 'Worker Server',
       position: { x: 650, y: 270 },
-      metadata: { hostname: 'worker-prod-01', ipAddress: '10.0.2.31', status: 'warning', location: 'Zone B' },
+      metadata: { hostname: 'worker-prod-01', ipAddress: '10.0.2.31', location: 'Zone B' },
     },
   ],
   edges: [

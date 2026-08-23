@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Connection } from '@xyflow/react';
 import { addEdge, addGroup, addNode, copySelection, moveGroup, moveSelection, pasteClipboard, removeSelection, updateNode, type GraphClipboard, type GraphCommandResult } from '../editing/graphCommands';
 import { applyGraphCommand, beginGraphEdit, cancelGraphEdit, createGraphEditorSession, redoGraphEdit, saveGraphEdit, undoGraphEdit } from '../editing/graphEditorSession';
@@ -16,7 +16,8 @@ import { GraphViewerView } from '../views/GraphViewerView';
 import { exportGraph, importGraph } from '../editing/graphSerialization';
 import { createLayoutCoordinator, createWorkerLayoutExecutor } from '../layout/layoutCoordinator';
 import { useTopologyRealtime } from '../realtime/useTopologyRealtime';
-import type { MockRealtimeOptions } from '../realtime/mockTopologyTransport';
+import { createGraphRuntimeSource, type GraphRuntimeSource } from '../realtime/graphRuntimeSource';
+import { networkRuntimeSource } from '../network/networkRealtime';
 
 type NetworkGraph = GraphDocument<NetworkNodeType, NetworkNodeMetadata, NetworkEdgeMetadata>;
 
@@ -37,14 +38,14 @@ export type GraphViewerContainerProps = {
   initialDraftGraph?: NetworkGraph;
   initialDirty?: boolean;
   initialValidationErrors?: readonly GraphValidationError[];
-  realtimeOptions?: MockRealtimeOptions;
+  realtimeSource?: GraphRuntimeSource;
 };
 
 export default function GraphViewerContainer({
   graph = networkGraph, idFactory = browserGraphIdFactory, initialDirty = false, initialDraftGraph,
   initialEditMode = false, initialRoute = null, initialRouteQuery = initialRoute ? { status: 'success' } : { status: 'idle' },
   initialValidationErrors = [], layoutEngine = providedPositionLayout, repository, routeService = networkRouteService,
-  validationService = createMockNetworkValidationService(), realtimeOptions,
+  validationService = createMockNetworkValidationService(), realtimeSource,
 }: GraphViewerContainerProps) {
   const requestSequence = useRef(0);
   const clipboardRef = useRef<GraphClipboard<NetworkNodeType, NetworkNodeMetadata, NetworkEdgeMetadata> | null>(null);
@@ -66,10 +67,25 @@ export default function GraphViewerContainer({
   const [paletteType, setPaletteType] = useState<NetworkNodeType | null>(null);
   const [validationErrors, setValidationErrors] = useState<readonly GraphValidationError[]>(initialValidationErrors);
   const [saving, setSaving] = useState(false);
-  const realtime = useTopologyRealtime(graph, realtimeOptions);
-  const { setMonitoredNode } = realtime;
+  const runtimeSource = useMemo(
+    () => realtimeSource ?? (graph === networkGraph ? networkRuntimeSource : createGraphRuntimeSource(graph)),
+    [graph, realtimeSource],
+  );
+  const selectedNodeId = interaction.selection.nodeIds[0] ?? null;
+  const realtime = useTopologyRealtime({
+    topologyId: runtimeSource.topologyId,
+    graph,
+    transport: runtimeSource.transport,
+    loadSnapshot: runtimeSource.loadSnapshot,
+    selectedNodeId,
+  });
 
-  useEffect(() => setMonitoredNode(interaction.selection.nodeIds[0] ?? null), [interaction.selection.nodeIds, setMonitoredNode]);
+  useEffect(() => {
+    if (!runtimeSource.eventsPerSecond) return undefined;
+    const { createEvent, eventsPerSecond, transport } = runtimeSource;
+    transport.startStress(eventsPerSecond, createEvent);
+    return () => transport.stopStress();
+  }, [runtimeSource]);
 
   useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => {
@@ -129,7 +145,7 @@ export default function GraphViewerContainer({
     const typeCount = draftGraph.nodes.filter((node) => node.type === type).length + 1;
     applyCommand(addNode(draftGraph, {
       id, type, label: `${getNetworkNodePresentation(type).typeLabel} ${String(typeCount)}`, position,
-      metadata: { hostname: id, ipAddress: 'Unassigned', status: 'healthy', location: 'Unassigned', description: '' },
+      metadata: { hostname: id, ipAddress: 'Unassigned', location: 'Unassigned', description: '' },
     }));
     setInteraction((current) => ({ ...current, selection: { nodeIds: [id], edgeIds: [], groupIds: [] } }));
     setPaletteType(null);
@@ -255,6 +271,8 @@ export default function GraphViewerContainer({
       routeQuery={routeQuery}
       connectionState={realtime.connectionState}
       runtime={realtime.runtime}
+      isNodeStale={realtime.isNodeStale}
+      selectedMetricHistory={realtime.selectedMetricHistory}
     />
   );
 }

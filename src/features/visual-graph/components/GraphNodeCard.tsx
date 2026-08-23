@@ -3,7 +3,7 @@ import { memo } from 'react';
 import type { GraphNodePresentation } from '../model/graph';
 import type { GraphNodeVisualState } from '../model/graphInteraction';
 import type { GraphDetailLevel } from '../performance/graphViewAdapter';
-import type { NodeRuntimeState } from '../realtime/topologyRealtime';
+import type { NodeRuntimeState, NodeRuntimeStatus } from '../realtime/types';
 
 export type GraphNodeData = {
   label: string;
@@ -18,6 +18,14 @@ export type GraphNodeData = {
 };
 
 export type GraphFlowNode = Node<GraphNodeData, 'graph-node'>;
+
+const runtimeStatusIcon: Record<NodeRuntimeStatus, string> = {
+  unknown: '?',
+  healthy: '✓',
+  warning: '!',
+  critical: '×',
+  offline: '○',
+};
 
 function GraphNodeCardComponent({ data, selected }: NodeProps<GraphFlowNode>) {
   const { dimmed, hovered, routeRole } = data.visualState;
@@ -35,6 +43,7 @@ function GraphNodeCardComponent({ data, selected }: NodeProps<GraphFlowNode>) {
         `graph-node--runtime-${status}`,
         data.runtimeStale ? 'graph-node--runtime-stale' : '',
       ].join(' ')}
+      aria-label={`${data.label}, ${status}${data.runtimeStale ? ', stale' : ''}`}
       data-route-role={routeRole}
       data-runtime-status={status}
     >
@@ -49,7 +58,12 @@ function GraphNodeCardComponent({ data, selected }: NodeProps<GraphFlowNode>) {
       {routeRole === 'source' || routeRole === 'destination' ? (
         <span className="graph-node__route-role">{routeRole === 'source' ? 'Start' : 'End'}</span>
       ) : null}
-      {data.detailLevel !== 'compact' ? <span className={`graph-node__runtime-badge graph-node__runtime-badge--${status}`}>{data.runtimeStale ? 'Stale' : status}</span> : null}
+      {data.detailLevel !== 'compact' ? (
+        <span className={`graph-node__runtime-badge graph-node__runtime-badge--${status}`} title={data.runtimeStale ? 'Runtime data is stale' : status}>
+          <span aria-hidden="true">{data.runtimeStale ? '◷' : runtimeStatusIcon[status]}</span>
+          {data.runtimeStale ? 'Stale' : status}
+        </span>
+      ) : null}
       <Handle className="graph-node__handle" id="output" isConnectable={data.editable} position={Position.Right} type="source" />
     </div>
   );
