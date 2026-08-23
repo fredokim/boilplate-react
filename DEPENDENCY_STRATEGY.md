@@ -37,12 +37,14 @@ one place fails the check, so an exception cannot be granted quietly.
 ### `hls.js`
 
 - **Installed:** ~31MB, almost all of it source maps and the several prebuilt variants.
-- **Shipped:** ~352KB, from the `hls.js/light` build, in its own lazily loaded chunk.
+- **Shipped:** ~111KB gzip (~352KB raw), from the `hls.js/light` build, in its own
+  lazily loaded chunk. It is the largest chunk in the app and still inside the 150KB
+  gzip budget.
 - **Why:** HLS playback needs Media Source Extensions driven by a library on every
   browser except Safari and iOS, which play HLS natively. The player selects the native
   path first and only imports hls.js when the platform cannot play the stream itself, so
   a Safari visitor downloads none of it.
-- **Lighter alternative considered:** the full build (~603KB shipped) was rejected for the
+- **Lighter alternative considered:** the full build (~603KB raw) was rejected for the
   light build, which keeps low-latency part loading and drops subtitle rendering,
   alternate audio switching, and EME — none of which this player surfaces.
 - **Revisit when:** the player needs subtitles, multiple audio tracks, or DRM, or when
