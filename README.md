@@ -76,6 +76,7 @@ MSW scenarios in `src/test/msw/scenarios.ts` can switch these APIs to success, e
 ## More Docs
 
 - `DESIGN_RATIONALE.md`: problem definition, component design method, key decisions, results, and retrospective.
+- `VISUAL_GRAPH.md`: layer map, realtime pipeline, editing session model, and layout/performance strategy for the graph example.
 - `ARCHITECTURE.md`: boundaries and ownership rules.
 - `CONTRIBUTING.md`: checklist for new UI/features.
 - `DEPENDENCY_STRATEGY.md`: package replacement and dependency review rules.
