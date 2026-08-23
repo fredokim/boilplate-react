@@ -18,12 +18,33 @@ export type GraphEdge<TMetadata extends GraphMetadata = GraphMetadata> = {
   sourceNodeId: string;
   targetNodeId: string;
   label?: string;
+  sourcePortId?: string;
+  targetPortId?: string;
   metadata: TMetadata;
 };
 
+export type GraphSelection = {
+  nodeIds: readonly string[];
+  edgeIds: readonly string[];
+  groupIds: readonly string[];
+};
+
+export const emptyGraphSelection = (): GraphSelection => ({ nodeIds: [], edgeIds: [], groupIds: [] });
+
+export type GraphGroup = {
+  id: string;
+  name: string;
+  childNodeIds: readonly string[];
+  expanded: boolean;
+};
+
 export type GraphRoute = {
-  routeNodeIds: readonly string[];
-  routeEdgeIds: readonly string[];
+  id: string;
+  sourceNodeId: string;
+  destinationNodeId: string;
+  nodeIds: readonly string[];
+  edgeIds: readonly string[];
+  metadata?: GraphMetadata;
 };
 
 export type GraphDocument<
@@ -33,7 +54,7 @@ export type GraphDocument<
 > = {
   nodes: readonly GraphNode<TNodeType, TNodeMetadata>[];
   edges: readonly GraphEdge<TEdgeMetadata>[];
-  route?: GraphRoute;
+  groups?: readonly GraphGroup[];
 };
 
 export type GraphNodePresentation = {
@@ -43,4 +64,3 @@ export type GraphNodePresentation = {
 };
 
 export type GraphNodePresentationResolver<TNodeType extends string> = (type: TNodeType) => GraphNodePresentation;
-

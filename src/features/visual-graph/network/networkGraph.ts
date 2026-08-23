@@ -7,11 +7,14 @@ export type NetworkNodeMetadata = {
   ipAddress: string;
   status: 'healthy' | 'warning';
   location: string;
+  description?: string;
 };
 
 export type NetworkEdgeMetadata = {
   protocol: string;
   bandwidthMbps: number;
+  interface: string;
+  status: 'up' | 'degraded';
 };
 
 export const networkGraph: GraphDocument<NetworkNodeType, NetworkNodeMetadata, NetworkEdgeMetadata> = {
@@ -51,25 +54,23 @@ export const networkGraph: GraphDocument<NetworkNodeType, NetworkNodeMetadata, N
       sourceNodeId: 'core-router',
       targetNodeId: 'edge-firewall',
       label: 'uplink',
-      metadata: { protocol: 'BGP', bandwidthMbps: 10000 },
+      metadata: { protocol: 'BGP', bandwidthMbps: 10000, interface: 'xe-0/0/1', status: 'up' },
     },
     {
       id: 'firewall-to-api',
       sourceNodeId: 'edge-firewall',
       targetNodeId: 'api-server',
-      metadata: { protocol: 'HTTPS', bandwidthMbps: 1000 },
+      label: 'api lane',
+      metadata: { protocol: 'HTTPS', bandwidthMbps: 1000, interface: 'eth0', status: 'up' },
     },
     {
       id: 'firewall-to-worker',
       sourceNodeId: 'edge-firewall',
       targetNodeId: 'worker-server',
-      metadata: { protocol: 'TLS', bandwidthMbps: 1000 },
+      label: 'worker lane',
+      metadata: { protocol: 'TLS', bandwidthMbps: 1000, interface: 'eth1', status: 'degraded' },
     },
   ],
-  route: {
-    routeNodeIds: ['core-router', 'edge-firewall', 'api-server'],
-    routeEdgeIds: ['router-to-firewall', 'firewall-to-api'],
-  },
 };
 
 export const getNetworkNodePresentation: GraphNodePresentationResolver<NetworkNodeType> = (type) => {
@@ -81,4 +82,3 @@ export const getNetworkNodePresentation: GraphNodePresentationResolver<NetworkNo
 
   return presentations[type];
 };
-
