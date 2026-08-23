@@ -77,6 +77,7 @@ MSW scenarios in `src/test/msw/scenarios.ts` can switch these APIs to success, e
 
 - `DESIGN_RATIONALE.md`: problem definition, component design method, key decisions, results, and retrospective.
 - `VISUAL_GRAPH.md`: layer map, realtime pipeline, editing session model, and layout/performance strategy for the graph example.
+- `REALTIME_INTEGRATION.md`: how the streaming layer binds to React, and what the adapter must get right.
 - `ARCHITECTURE.md`: boundaries and ownership rules.
 - `CONTRIBUTING.md`: checklist for new UI/features.
 - `DEPENDENCY_STRATEGY.md`: package replacement and dependency review rules.
