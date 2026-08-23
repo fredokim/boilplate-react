@@ -15,6 +15,9 @@ const timeFormatter = new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '
 /** Treat "within this many pixels of the bottom" as still pinned to live. */
 const PIN_THRESHOLD_PX = 24;
 
+/** Matches the .messages height in the stylesheet. */
+const CHAT_VIEWPORT_HEIGHT_PX = 420;
+
 export const RealtimeChat = memo(function RealtimeChat({ connectionState, diagnostics, messages }: RealtimeChatProps) {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(true);
@@ -26,6 +29,22 @@ export const RealtimeChat = memo(function RealtimeChat({ connectionState, diagno
     estimateSize: () => 64,
     getItemKey: (index) => messages[index]?.id ?? index,
     getScrollElement: () => scrollElement,
+    // jsdom reports no element size, and a real browser reports none until the first
+    // measurement, so give the virtualiser the viewport height the stylesheet fixes.
+    initialRect: { width: 320, height: CHAT_VIEWPORT_HEIGHT_PX },
+    observeElementRect: (instance, callback) => {
+      const element = instance.scrollElement;
+      const measure = () =>
+        callback({
+          width: element && element.clientWidth > 0 ? element.clientWidth : 320,
+          height: element && element.clientHeight > 0 ? element.clientHeight : CHAT_VIEWPORT_HEIGHT_PX,
+        });
+      measure();
+      if (!element || typeof ResizeObserver === 'undefined') return () => undefined;
+      const observer = new ResizeObserver(measure);
+      observer.observe(element);
+      return () => observer.disconnect();
+    },
     overscan: 6,
   });
 

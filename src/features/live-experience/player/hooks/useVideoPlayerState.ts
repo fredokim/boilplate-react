@@ -7,8 +7,10 @@ function readDuration(video: HTMLVideoElement) {
 }
 
 function readSeekable(video: HTMLVideoElement) {
-  const { seekable } = video;
-  if (seekable.length === 0) return { seekableStart: 0, seekableEnd: 0 };
+  // A detached element reports no seekable range at all, so treat a missing one as empty
+  // rather than letting a timeupdate during teardown throw.
+  const seekable = video.seekable as TimeRanges | undefined;
+  if (!seekable || seekable.length === 0) return { seekableStart: 0, seekableEnd: 0 };
   return { seekableStart: seekable.start(0), seekableEnd: seekable.end(seekable.length - 1) };
 }
 

@@ -32,8 +32,7 @@ export function createHlsJsEngine(): PlaybackEngine {
 
   return {
     attach: async (video, source: VideoSource, handlers: EngineHandlers) => {
-      const module = await import('hls.js/light');
-      const Hls = module.default;
+      const { default: Hls } = await import('hls.js/light');
 
       if (!Hls.isSupported()) {
         const error: PlayerError = {
