@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { setAccessTokenProvider } from '@core/api/apiClient';
+import { setAccessTokenProvider, setTokenRefresher } from '@core/api/apiClient';
 import { tokenStorage } from '@core/auth/tokenStorage';
 import { fallbackState, parseState } from '@core/state/validateState';
+import { authApi } from '@features/auth/api/auth.api';
 import type { AuthUserDto } from '@features/auth/dto/Auth.dto';
 import { authStateSnapshotSchema, authUserStateSchema, type AuthStatus } from './auth.schema';
 
@@ -60,3 +61,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 setAccessTokenProvider(() => useAuthStore.getState().accessToken);
+
+/**
+ * Lets an expired access token recover instead of ending the session.
+ *
+ * A failed refresh logs out rather than leaving the store holding a token the
+ * server has stopped honouring — a state where the UI looks signed in and every
+ * request 401s.
+ */
+setTokenRefresher(async () => {
+  try {
+    const result = await authApi.refresh();
+    useAuthStore.getState().setSession(result.user, result.accessToken);
+    return result.accessToken;
+  } catch {
+    useAuthStore.getState().logout();
+    return null;
+  }
+});

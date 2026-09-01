@@ -31,6 +31,29 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5174,
     strictPort: true,
+    /**
+     * Forwards `/api` to the backend so server mode works in development.
+     *
+     * The api client uses a relative `baseURL: '/api'`, so without this the
+     * browser asks Vite for those paths and gets the SPA fallback — which is not
+     * an obvious failure, because the response is a 200 full of HTML that only
+     * fails later at DTO validation.
+     *
+     * A proxy rather than an absolute URL plus CORS: same-origin means the
+     * refresh cookie is sent without any cross-site cookie rules to satisfy, and
+     * it matches how the app is served in production.
+     *
+     * `ws: true` covers the two gateways, `/api/topology` and `/api/live/chat`.
+     * Mock mode never reaches any of this — nothing is proxied because nothing
+     * is requested.
+     */
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_TARGET ?? 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
   build: {
     sourcemap: true,

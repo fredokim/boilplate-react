@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -39,30 +39,73 @@ const spec = loadSpec();
  */
 const describeIfSpec = spec ? describe : describe.skip;
 
+/**
+ * Every URL the api modules pass to `requestDto`, reduced to a comparable path
+ * shape: each template expression becomes `{}`, and the shared `/api` prefix is
+ * added because the client's axios instance carries it as its baseURL.
+ *
+ * Parameter *names* are deliberately discarded. The client writes whatever
+ * expression it has to hand — `${personalization.dashboardId}` — while the
+ * server names the placeholder in its route decorator. Comparing the names
+ * reports a mismatch for two spellings of the same endpoint; comparing the
+ * shapes reports only a route that genuinely has nothing behind it.
+ */
+function frontendEndpoints(): string[] {
+  const apiDir = resolve(__dirname, '../../features');
+  const found = new Set<string>();
+
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.ts') || entry.name.includes('.test.')) continue;
+
+      const source = readFileSync(full, 'utf8');
+
+      for (const match of source.matchAll(/url: [`']([^`']+)[`']/g)) {
+        const raw = match[1];
+        if (!raw?.startsWith('/')) continue;
+
+        found.add(`/api${raw.replace(/\$\{[^}]*\}/g, '{}')}`);
+      }
+    }
+  };
+
+  walk(apiDir);
+
+  return [...found].sort();
+}
+
 function propertiesOf(schema: string): string[] {
   return Object.keys(spec?.components.schemas[schema]?.properties ?? {}).sort();
 }
 
 describeIfSpec('server contract', () => {
+  /**
+   * The endpoint list is derived from the source rather than written by hand.
+   *
+   * The hand-written version missed `/users` — an endpoint the dashboard has
+   * always called and the server never implemented. It listed what had been
+   * built rather than what the client asks for, so it agreed with itself and
+   * proved nothing. Reading the api modules makes the test fail when a call has
+   * no route behind it, which is the only version worth having.
+   */
   it('publishes every endpoint the frontend calls', () => {
-    const called = [
-      '/api/auth/login',
-      '/api/auth/session',
-      '/api/auth/refresh',
-      '/api/auth/logout',
-      '/api/dashboard/summary',
-      '/api/dashboard/kpi',
-      '/api/dashboard/chart',
-      '/api/dashboard/table',
-      '/api/dashboards/{dashboardId}',
-      '/api/dashboards/{dashboardId}/personalization',
-      '/api/graphs/{graphId}',
-      '/api/graphs/{graphId}/topology/snapshot',
-      '/api/live/broadcasts/{broadcastId}',
-      '/api/live/broadcasts/{broadcastId}/chat/messages',
-    ];
+    const published = new Set(Object.keys(spec?.paths ?? {}).map((path) => path.replace(/\{[^}]*\}/g, '{}')));
 
-    expect(Object.keys(spec?.paths ?? {})).toEqual(expect.arrayContaining(called));
+    const called = frontendEndpoints();
+
+    // A walk that finds nothing would pass this test forever. It has caught a
+    // real endpoint before, so an empty result means the scan broke, not that
+    // the frontend stopped calling anything.
+    expect(called.length).toBeGreaterThan(5);
+
+    expect(called.filter((endpoint) => !published.has(endpoint))).toEqual([]);
   });
 
   /**

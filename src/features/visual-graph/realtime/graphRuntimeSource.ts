@@ -1,5 +1,6 @@
 import type { GraphDocument } from '../model/graph';
 import { MockTopologyTransport } from './mockTransport';
+import type { TopologyRealtimeTransport } from './transport';
 import type {
   EdgeRuntimeState,
   EdgeRuntimeStatus,
@@ -51,10 +52,30 @@ class ScriptedMockTransport extends MockTopologyTransport {
   }
 }
 
-export type GraphRuntimeSource = {
+/**
+ * What the viewer actually needs: something to connect to and a snapshot to seed
+ * from. The scripted mock satisfies it, and so does the server transport.
+ *
+ * The viewer used to take the mock type directly, which is why server mode had
+ * nowhere to plug in — `ServerTopologyTransport` implemented the right transport
+ * interface but the container demanded a `ScriptedMockTransport`.
+ */
+export type GraphRealtimeSource = {
   topologyId: string;
-  transport: ScriptedMockTransport;
+  transport: TopologyRealtimeTransport;
   loadSnapshot: RuntimeSnapshotProvider;
+  /**
+   * Starts the scripted event generator and returns a stop function.
+   *
+   * Absent on a server source — there the events come from the gateway, and a
+   * fabricated stream on top of them would be indistinguishable from real
+   * traffic in the UI.
+   */
+  driveEvents?: () => () => void;
+};
+
+export type GraphRuntimeSource = GraphRealtimeSource & {
+  transport: ScriptedMockTransport;
   createEvent: (index: number) => TopologyRealtimeEvent;
   eventsPerSecond: number;
   disconnectAfterMs: number;
@@ -129,13 +150,27 @@ export function createGraphRuntimeSource(
     return { eventId: `edge-metric-${String(sequence)}`, topologyId, entityId, timestamp, sequence, type: 'EDGE_METRIC_UPDATED', payload: { metrics } };
   };
 
+  const transport = new ScriptedMockTransport(options.initialEvents ?? [], options.disconnectAfterMs ?? 0);
+  const eventsPerSecond = options.eventsPerSecond ?? 10;
+
   return {
     topologyId,
-    transport: new ScriptedMockTransport(options.initialEvents ?? [], options.disconnectAfterMs ?? 0),
+    transport,
     loadSnapshot,
     createEvent,
-    eventsPerSecond: options.eventsPerSecond ?? 10,
+    eventsPerSecond,
     disconnectAfterMs: options.disconnectAfterMs ?? 0,
+    // Spread rather than `driveEvents: undefined`: under
+    // `exactOptionalPropertyTypes` an explicit undefined is not the same as an
+    // absent field, and absent is what "this source generates nothing" means.
+    ...(eventsPerSecond
+      ? {
+          driveEvents: () => {
+            transport.startStress(eventsPerSecond, createEvent);
+            return () => transport.stopStress();
+          },
+        }
+      : {}),
   };
 }
 
