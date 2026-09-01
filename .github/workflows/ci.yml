@@ -202,8 +202,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Root context: the image carries the built frontend as well as the API,
+      # because the browser has to see one origin (see server/DEPLOYMENT.md).
       - name: Build the production image
-        run: docker build -t react-boilerplate-server:ci ./server
+        run: docker build -t react-boilerplate:ci .
       # A build that succeeds proves nothing about whether the entrypoint runs.
       # This starts the container with no database and asserts that liveness
       # answers anyway — which is the documented behaviour and the property the
@@ -215,7 +217,7 @@ jobs:
             -e COOKIE_SECURE=true \
             -e JWT_SECRET=ci-secret-value-that-is-long-enough-32 \
             -e DATABASE_URL=postgresql://unused:unused@127.0.0.1:5432/unused?schema=public \
-            react-boilerplate-server:ci
+            react-boilerplate:ci
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3001/api/health/live > /dev/null; then
               echo "liveness answered after ${i}s"
@@ -224,6 +226,22 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:3001/api/health/live
+
+          # The image has to carry the frontend too. Serving the API alone looks
+          # like a successful deploy until someone opens the page, and a missing
+          # COPY in the Dockerfile is exactly the kind of thing that survives
+          # every other check.
+          curl -fsS http://127.0.0.1:3001/ | grep -q 'id="root"'
+          echo "the container serves the client"
+
+          # A deep link must reach the SPA rather than 404 — the fallback is what
+          # makes a shared link work at all.
+          curl -fsS http://127.0.0.1:3001/examples/graph | grep -q 'id="root"'
+
+          # ...and an unknown API path must NOT be answered with the SPA, or a
+          # missing route becomes a 200 full of HTML that only fails later.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/api/nope)" = 404
+
           # Readiness must fail without a database — if it passed, the probe is
           # not checking anything.
           if curl -fsS http://127.0.0.1:3001/api/health/ready > /dev/null; then
