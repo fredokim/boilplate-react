@@ -129,6 +129,12 @@ jobs:
       - name: Check migration status
         run: npx prisma migrate status
 
+      # `migrate diff --shadow-database-url` expects the database to exist
+      # already — unlike `migrate dev`, it does not create one. The first run of
+      # this job failed with P1003 for exactly that reason.
+      - name: Create the shadow database
+        run: PGPASSWORD=ci psql -h localhost -U ci -d ci -c 'CREATE DATABASE ci_shadow;'
+
       # The drift that actually matters: does replaying the migrations produce
       # the schema.prisma everyone is coding against? An empty diff means yes.
       # A non-empty one means someone edited the schema without a migration, and
