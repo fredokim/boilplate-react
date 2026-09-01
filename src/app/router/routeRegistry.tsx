@@ -1,6 +1,6 @@
 import { withAuthGuard } from "@hoc/withAuthGuard";
 import { withPermission } from "@hoc/withPermission";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactElement } from "react";
 import { lazy } from "react";
 
 export type AppRouteConfig = {
@@ -43,7 +43,25 @@ const baseRoutes = [
 export const appRoutes = [...baseRoutes, ...Object.values(generatedModules).map((module) => module.default)];
 export const navRoutes = appRoutes.filter((route) => route.nav);
 
-export function createRouteElement(route: AppRouteConfig) {
+/**
+ * Builds one route element per route, once, at module scope.
+ *
+ * `lazy()` and the guard HOCs each produce a new component *type* on every call.
+ * Calling them while rendering therefore hands React a different type for the
+ * same route on every pass: it unmounts the previous subtree, mounts a fresh
+ * lazy component, and that one suspends again. On a path that re-renders the
+ * router — an auth redirect, for instance — the cycle never settles and the page
+ * stays blank with no error in the console.
+ *
+ * Route configuration is static, so the elements are built here and reused. This
+ * is not an optimisation; rebuilding them per render is incorrect.
+ */
+export const routeElements: readonly { path: string; element: ReactElement }[] = appRoutes.map((route) => ({
+  path: route.path,
+  element: createRouteElement(route),
+}));
+
+function createRouteElement(route: AppRouteConfig) {
   const LazyRoute = lazy(route.loader);
   const AuthGuardedRoute = route.auth === false ? LazyRoute : withAuthGuard(LazyRoute);
   const GuardedRoute = route.permission ? withPermission(route.permission, AuthGuardedRoute) : AuthGuardedRoute;
