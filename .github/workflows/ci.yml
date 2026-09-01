@@ -108,6 +108,12 @@ jobs:
       # database. It must be separate from the one under test.
       SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow?schema=public
       JWT_SECRET: ci-secret-value-that-is-long-enough-32
+      # Without these the seed takes its early return after the roles and never
+      # reaches the demo account, broadcast, or graph — so the step below would
+      # report success while leaving most of the seed unexecuted. These are
+      # throwaway credentials for a container that is destroyed with the job.
+      SEED_ADMIN_EMAIL: ci@example.com
+      SEED_ADMIN_PASSWORD: ci-seed-password
 
     steps:
       - uses: actions/checkout@v4
@@ -154,8 +160,16 @@ jobs:
           echo "Migrations reproduce schema.prisma exactly."
 
       # The seed has to work against the real schema, not only compile. It is
-      # also the only thing that exercises the role upsert.
+      # also the only thing that exercises the role upsert, the demo graph's
+      # node/edge createMany, and the runtime-state upserts.
       - name: Run the seed
+        run: npm run prisma:seed
+
+      # Re-running is not redundant: every write in the seed is an upsert or a
+      # delete-then-insert, and "safe to run twice" is a property that only a
+      # second run can demonstrate. A unique constraint tripping here would
+      # otherwise first appear on a developer's machine.
+      - name: Run the seed again
         run: npm run prisma:seed
 
       # RUN_INTEGRATION=1 turns skipping off. Without it the suite would skip and
