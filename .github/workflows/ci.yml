@@ -7,7 +7,10 @@ on:
       - main
 
 jobs:
-  verify:
+  # The frontend gate, unchanged in meaning. The server is a separate package
+  # with its own toolchain, so it gets its own job rather than being appended
+  # here — a failing server lint should not hide a passing frontend build.
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,4 +27,188 @@ jobs:
       - run: npm run build
       - run: npm run check:bundle
       - run: npm run build-storybook
+      # The e2e suite was never wired into CI, and a router bug that left the
+      # first page a user sees completely blank went unnoticed because of it:
+      # every other gate was green throughout. Unit tests render components in
+      # isolation and cannot see a navigation that never settles.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
       - run: npm audit --audit-level=moderate
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      # postinstall runs `prisma generate`, which needs no database.
+      - run: npm ci
+
+      # Prisma checks come first: a schema that does not validate makes every
+      # later failure a symptom rather than a cause.
+      - run: npx prisma format --check
+      - run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run test:e2e
+      - run: npm run build
+
+      # Fails when the committed openapi.json no longer matches the code. A spec
+      # that silently falls behind is worse than none: it looks authoritative
+      # while describing an API that no longer exists.
+      - run: node dist/tools/checkOpenApiDrift.js
+
+      # Production dependencies only. The remaining dev-tree advisory has no
+      # upstream fix and cannot reach a deployed artefact.
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  # Everything that needs a real PostgreSQL, and nothing that does not.
+  #
+  # The migrations were authored offline with `prisma migrate diff` on a machine
+  # with no database, so until this job runs nothing has ever proved the SQL
+  # applies. It also covers the claims the in-memory fake cannot: a unique
+  # constraint is not enforced by a Map, and "two concurrent writers cannot get
+  # the same sequence" is an argument until a database refuses one.
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        # Without this the job races the container and the first query fails for
+        # a reason that has nothing to do with the code.
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      # Prisma creates and drops this to check migrations against a clean
+      # database. It must be separate from the one under test.
+      SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow?schema=public
+      JWT_SECRET: ci-secret-value-that-is-long-enough-32
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+
+      # `migrate deploy`, not `migrate dev`: it applies committed migrations and
+      # never generates or edits one. A deploy step that could author a migration
+      # would be a deploy step that changes the schema nobody reviewed.
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      # Proves every migration is recorded and none is pending — a migration that
+      # applied but did not register would re-run on the next deploy.
+      - name: Check migration status
+        run: npx prisma migrate status
+
+      # The drift that actually matters: does replaying the migrations produce
+      # the schema.prisma everyone is coding against? An empty diff means yes.
+      # A non-empty one means someone edited the schema without a migration, and
+      # the code and the database have quietly disagreed since.
+      - name: Check schema and migrations agree
+        run: |
+          DIFF=$(npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --script)
+          if [ -n "$(echo "$DIFF" | grep -v '^--' | tr -d '[:space:]')" ]; then
+            echo "schema.prisma does not match the committed migrations:"
+            echo "$DIFF"
+            exit 1
+          fi
+          echo "Migrations reproduce schema.prisma exactly."
+
+      # The seed has to work against the real schema, not only compile. It is
+      # also the only thing that exercises the role upsert.
+      - name: Run the seed
+        run: npm run prisma:seed
+
+      # RUN_INTEGRATION=1 turns skipping off. Without it the suite would skip and
+      # this job would pass while checking nothing.
+      - name: Integration tests against PostgreSQL
+        run: npm run test:integration
+        env:
+          RUN_INTEGRATION: '1'
+
+  # The frontend's assumptions checked against the server's published spec. It
+  # needs both packages installed, which is why it is not part of either job.
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix server
+      - run: npm run build --prefix server
+      - run: node server/dist/tools/generateOpenApi.js
+      # Regenerating first means the contract test runs against the spec this
+      # commit produces, not a stale committed one — the drift job above is what
+      # keeps the committed copy honest.
+      - run: npx vitest run src/test/contract
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t react-boilerplate-server:ci ./server
+      # A build that succeeds proves nothing about whether the entrypoint runs.
+      # This starts the container with no database and asserts that liveness
+      # answers anyway — which is the documented behaviour and the property the
+      # liveness/readiness split depends on.
+      - name: Smoke test the container
+        run: |
+          docker run -d --name smoke -p 3001:3001 \
+            -e NODE_ENV=production \
+            -e COOKIE_SECURE=true \
+            -e JWT_SECRET=ci-secret-value-that-is-long-enough-32 \
+            -e DATABASE_URL=postgresql://unused:unused@127.0.0.1:5432/unused?schema=public \
+            react-boilerplate-server:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/api/health/live > /dev/null; then
+              echo "liveness answered after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3001/api/health/live
+          # Readiness must fail without a database — if it passed, the probe is
+          # not checking anything.
+          if curl -fsS http://127.0.0.1:3001/api/health/ready > /dev/null; then
+            echo "readiness passed without a database; the probe is not checking anything"
+            exit 1
+          fi
+          docker logs smoke
+          docker rm -f smoke

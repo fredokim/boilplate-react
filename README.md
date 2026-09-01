@@ -73,12 +73,155 @@ The Vite dev app starts MSW automatically in development. Dummy data lives in `s
 
 MSW scenarios in `src/test/msw/scenarios.ts` can switch these APIs to success, empty, invalid DTO, backend error, or timeout responses.
 
+## Backend Development
+
+A NestJS + PostgreSQL + Prisma server lives in `server/`. It is a separate npm
+package with its own dependencies and toolchain — the frontend build, lint,
+typecheck, and tests do not touch it.
+
+**The frontend still runs on MSW.** No client code points at the server yet.
+
+```bash
+cd server
+npm install                 # postinstall runs `prisma generate`
+cp .env.example .env        # DATABASE_URL has no default
+npm run db:up               # PostgreSQL via Docker Compose
+npm run prisma:migrate      # once schema.prisma has models
+npm run prisma:seed
+npm run start:dev           # http://localhost:3001/api, docs at /api/docs
+```
+
+The server starts without a reachable database: `/api/health/live` stays up and
+only `/api/health/ready` reports the failure.
+
+From the repository root:
+
+| Command | Does |
+| --- | --- |
+| `npm run server:dev` | Server in watch mode |
+| `npm run server:build` | Compile the server |
+| `npm run server:lint` | Lint the server |
+| `npm run server:typecheck` | Typecheck the server |
+| `npm run server:test` | Server unit tests |
+| `npm run server:test:e2e` | Server e2e tests |
+| `npm run server:openapi` | Write `server/openapi.json` |
+| `npm run server:check` | Every server gate |
+| `npm run dev:all` | Frontend and server together |
+| `npm run check:all` | `check:ci`, every server gate, and the contract test |
+| `npm run check:contract` | Frontend assumptions vs the server's OpenAPI spec |
+| `npm run server:openapi:check` | Fails when the committed spec drifts from the code |
+| `npm --prefix server run test:integration` | Server tests that need a real PostgreSQL |
+| `npm run dev:server-mode` | Frontend against the real server, no mocks |
+
+`server:prisma:validate` needs `server/.env`, which is gitignored, so it is not
+part of `server:check`.
+
+### One switch decides where data comes from
+
+`VITE_DATA_MODE` is `mock` (the default) or `server`. It governs MSW, the
+dashboard repositories, the topology transport, and the chat transport together —
+three separate switches was three ways to end up half-connected, with the
+dashboard on the server and chat still answering from a mock.
+
+**A production build with `VITE_DATA_MODE=mock` refuses to start.** A deployed app
+running on mocks looks healthy while every number on screen is fabricated, and
+nothing in the UI reveals it.
+
+The per-module variables (`VITE_DASHBOARD_REPOSITORY`, `VITE_TOPOLOGY_SOURCE`,
+`VITE_CHAT_SOURCE`) still work as an override within the chosen mode, for
+bringing one module up against a real server while the rest stay mocked.
+
+```bash
+npm run dev              # mocks, no backend needed
+npm run dev:server-mode  # the real server
+```
+
+### Auth
+
+`POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, and
+`GET /api/auth/session`. The login and session responses match the frontend's
+existing `LoginResultDto` and `SessionDto` exactly, so the client DTOs need no
+change to talk to the real server.
+
+`JWT_SECRET` is required and has no default. Create a local demo account with:
+
+```bash
+cd server
+# set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in .env first
+npm run prisma:seed
+```
+
+### Dashboard
+
+The four widget-data routes the app already calls are served unchanged, including
+the legacy `metric` parameter. Dashboard definitions and per-user personalization
+(presets, hidden widgets, overrides) persist in PostgreSQL with optimistic
+locking.
+
+The frontend keeps localStorage and memory persistence as the default. Opt into
+the server with:
+
+```bash
+VITE_DASHBOARD_REPOSITORY=server npm run dev
+```
+
+### Graph and realtime topology
+
+Graph structure persists in PostgreSQL with an optimistic lock; runtime status and
+metrics stream over a WebSocket at `/api/topology`, ordered by a per-graph
+sequence and replayable after a disconnect.
+
+The frontend keeps the mock transport as the default. Opt into the real one with:
+
+```bash
+VITE_TOPOLOGY_SOURCE=server npm run dev
+```
+
+The runtime store, controller, batching, coalescing, and backoff are untouched —
+only the transport and snapshot source are swapped.
+
+### Live experience and chat
+
+Broadcast metadata, short-lived playback grants, and a persisted chat with
+sequence-ordered history, idempotent sending, and moderation. The server is a
+control plane — it never encodes or serves media, and the manifest URL is only
+handed out through an expiring playback session.
+
+The frontend keeps the mock chat transport as the default:
+
+```bash
+VITE_CHAT_SOURCE=server npm run dev
+```
+
+HLS engine selection and live-edge calculation stay on the frontend; the server
+only states `sourceType` and `dvrEnabled`.
+
+### Health endpoints and the MSW contract
+
+The existing mock for `GET /api/health` returns `{ success: true, data: { status: "ok" } }`.
+The server keeps that field and meaning and adds to it:
+
+```jsonc
+{ "success": true, "data": {
+  "status": "ok",              // or "degraded" when a dependency is down
+  "uptimeSeconds": 12.5,
+  "checks": { "database": { "status": "up", "latencyMs": 1.4 } }
+} }
+```
+
+Anything reading `data.status` works against either. `"degraded"` is the one value
+the mock never produces — the mock is always healthy.
+
+`/api/health/live` and `/api/health/ready` are new and have no mock counterpart.
+
 ## More Docs
 
 - `DESIGN_RATIONALE.md`: problem definition, component design method, key decisions, results, and retrospective.
 - `VISUAL_GRAPH.md`: layer map, realtime pipeline, editing session model, and layout/performance strategy for the graph example.
 - `REALTIME_INTEGRATION.md`: how the streaming layer binds to React, and what the adapter must get right.
 - `ARCHITECTURE.md`: boundaries and ownership rules.
+- `server/README.md`: backend setup, commands, and known environment issues.
+- `server/ARCHITECTURE.md`: request flow, envelope ownership, and where the next backend modules go.
 - `CONTRIBUTING.md`: checklist for new UI/features.
 - `DEPENDENCY_STRATEGY.md`: package replacement and dependency review rules.
 - `AI_DEVELOPMENT_GUIDE.md`: rules for AI-assisted implementation.
