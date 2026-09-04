@@ -2,7 +2,11 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
+jobs:
   # The frontend gate. The backend lives in boilplate-server and runs its own
   # jobs there; this repository no longer builds or tests it.
   frontend:
