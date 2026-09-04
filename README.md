@@ -49,7 +49,7 @@ npm run generate -- page orders list
 - Automation checks enforce Storybook coverage, validation coverage, and mock registry presence.
 - Bundle budget checks fail CI when generated JS chunks exceed the configured size cap.
 - Dependency checks flag oversized runtime packages before they quietly become architectural defaults.
-- Design tokens: CSS variables are split into color, spacing, and radius token files.
+- Design tokens: colour, spacing, radius, and shadow variables are generated from a source shared with the Vue and Next.js boilerplates.
 - Date utilities: common date parsing, formatting, ranges, and relative labels live in `src/core/date/date.ts`.
 - Form validation: Zod validates user input before mutations.
 - Common UI: inputs, select, checkbox, radio group, modal, tabs, toast, table, and pagination are Storybook-ready.
@@ -232,3 +232,27 @@ the mock never produces — the mock is always healthy.
 - `PERFORMANCE_REPORT.md`: route, bundle, dependency, and rendering guardrails.
 - `I18N_STRATEGY.md`: typed dictionary, fallback locale, and formatting strategy.
 - `AI_CHANGELOG.md`: AI-assisted work log and verification notes.
+
+## Design tokens
+
+Colours, spacing, radii, and shadows come from `tokens/tokens.json`, which the
+React, Next.js, and Vue boilerplates share. The CSS and TypeScript files that
+declare them are generated; editing one is undone by the next build.
+
+```bash
+# after editing tokens/tokens.json
+npm run tokens:build
+```
+
+`npm run check:tokens` renders the outputs and compares them against what is
+committed, failing with the file, line, and both values when they differ. It
+runs as part of `check:ci`. It compares rather than regenerating on purpose: a
+check that rewrites the file it is checking cannot fail.
+
+A token may carry a dark value under `$extensions.mode.dark`. Nothing declares
+one yet, so no `prefers-color-scheme` block is emitted; adding one value is
+enough to produce the block.
+
+`TOKEN_INVENTORY.md` in the React repository records what the three sets looked
+like before they were merged, including two tokens that were deliberately not
+merged.

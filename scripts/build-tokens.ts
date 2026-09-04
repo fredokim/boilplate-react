@@ -15,7 +15,16 @@ import { dirname, join, resolve } from 'node:path';
  * browser's.
  */
 
-type Token = { $value: string; $type?: string; $description?: string };
+type Token = {
+  $value: string;
+  $type?: string;
+  $description?: string;
+  /**
+   * A token may carry a second value for dark mode. DTCG has no mode axis yet,
+   * so it lives under `$extensions`, which the draft reserves for exactly this.
+   */
+  $extensions?: { mode?: { dark?: string } };
+};
 
 const SOURCE = resolve(process.cwd(), 'tokens/tokens.json');
 const OUT_DIR = resolve(process.cwd(), 'src/styles/tokens');
@@ -89,6 +98,38 @@ function header(group: string): string {
   ].join(NEWLINE);
 }
 
+function declare(prefix: string, name: string, value: string, indent = '  '): string {
+  return `${indent}${prefix}${name}: ${value};`;
+}
+
+/**
+ * The dark block, or an empty string when no token in the group declares a dark
+ * value.
+ *
+ * Emitting an empty `@media` rule would be harmless but misleading: it would
+ * suggest the repository has a dark theme when it has none. Absence is the
+ * honest output, and it is also what keeps this change invisible until someone
+ * actually fills a dark value in.
+ */
+function darkBlock(group: string, prefix: string, members: string[]): string {
+  const overrides = members
+    .map((path) => [path, tokens.get(path)?.$extensions?.mode?.dark] as const)
+    .filter((entry): entry is readonly [string, string] => entry[1] !== undefined)
+    .map(([path, value]) => declare(prefix, path.slice(group.length + 1), value, '    '));
+
+  if (overrides.length === 0) return '';
+
+  return [
+    '',
+    '@media (prefers-color-scheme: dark) {',
+    '  :root {',
+    ...overrides,
+    '  }',
+    '}',
+    '',
+  ].join(NEWLINE);
+}
+
 /** Renders every output file's content without touching the disk. */
 export function renderOutputs(): Map<string, string> {
   const rendered = new Map<string, string>();
@@ -99,12 +140,14 @@ export function renderOutputs(): Map<string, string> {
     if (members.length === 0) throw new Error(`No tokens under ${output.group}`);
 
     const declarations = members
-      .map((path) => `  ${output.prefix}${path.slice(output.group.length + 1)}: ${resolveValue(path)};`)
+      .map((path) => declare(output.prefix, path.slice(output.group.length + 1), resolveValue(path)))
       .join(NEWLINE);
+
+    const dark = darkBlock(output.group, output.prefix, members);
 
     rendered.set(
       output.file,
-      `${header(output.group)}:root {${NEWLINE}${declarations}${NEWLINE}}${NEWLINE}`,
+      `${header(output.group)}:root {${NEWLINE}${declarations}${NEWLINE}}${NEWLINE}${dark}`,
     );
   }
 
