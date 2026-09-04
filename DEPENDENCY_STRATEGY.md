@@ -28,6 +28,28 @@ This boilerplate keeps dependencies small, explicit, and easy for AI-assisted de
 - Decorator DTO validation can be replaced by schema-first validation only if API response typing, error ownership, and generator output are migrated together.
 - Tailwind v4 migration should be done as a dedicated styling migration, not mixed with feature work.
 
+## Documented Size Exceptions
+
+`check:deps` fails a runtime dependency over 6MB installed unless it is listed as an
+exception in `scripts/check-dependency-size.ts` **and** named here. Listing it in only
+one place fails the check, so an exception cannot be granted quietly.
+
+### `hls.js`
+
+- **Installed:** ~31MB, almost all of it source maps and the several prebuilt variants.
+- **Shipped:** ~111KB gzip (~352KB raw), from the `hls.js/light` build, in its own
+  lazily loaded chunk. It is the largest chunk in the app and still inside the 150KB
+  gzip budget.
+- **Why:** HLS playback needs Media Source Extensions driven by a library on every
+  browser except Safari and iOS, which play HLS natively. The player selects the native
+  path first and only imports hls.js when the platform cannot play the stream itself, so
+  a Safari visitor downloads none of it.
+- **Lighter alternative considered:** the full build (~603KB raw) was rejected for the
+  light build, which keeps low-latency part loading and drops subtitle rendering,
+  alternate audio switching, and EME — none of which this player surfaces.
+- **Revisit when:** the player needs subtitles, multiple audio tracks, or DRM, or when
+  `ManagedMediaSource` support is broad enough that native playback covers everything.
+
 ## Review Checklist
 
 - Run `npm run check:deps` before adding a runtime dependency.

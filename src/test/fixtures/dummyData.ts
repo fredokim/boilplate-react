@@ -80,6 +80,61 @@ export const dummyDashboardSummary = {
   contractErrorRate: 0.2,
 };
 
+export const dummyDashboardKpi = {
+  kind: 'kpi' as const,
+  label: 'Gross revenue',
+  value: 48240,
+  trend: '+12.4% from last month',
+};
+
+export const dummyDashboardActiveUsers = {
+  kind: 'kpi' as const,
+  label: 'Active users',
+  value: 8429,
+  trend: '+4.1% this week',
+};
+
+export const dummyDashboardSeries = {
+  kind: 'series' as const,
+  points: [
+    { label: 'Mon', value: 3200 },
+    { label: 'Tue', value: 4100 },
+    { label: 'Wed', value: 3800 },
+    { label: 'Thu', value: 5200 },
+    { label: 'Fri', value: 6100 },
+  ],
+};
+
+export const dummyDashboardConversionSeries = {
+  kind: 'series' as const,
+  points: [
+    { label: 'Visit', value: 10000 },
+    { label: 'Signup', value: 4200 },
+    { label: 'Trial', value: 2100 },
+    { label: 'Paid', value: 980 },
+  ],
+};
+
+export const dummyDashboardTable = {
+  kind: 'table' as const,
+  columns: [
+    { key: 'event' as const, label: 'Event' },
+    { key: 'owner' as const, label: 'Owner' },
+    { key: 'status' as const, label: 'Status' },
+  ],
+  rows: [
+    { id: 'event-1', event: 'Campaign launched', owner: 'Mina', status: 'Complete' },
+    { id: 'event-2', event: 'Threshold updated', owner: 'Jun', status: 'Review' },
+    { id: 'event-3', event: 'Report generated', owner: 'Alex', status: 'Complete' },
+  ],
+};
+
+export const emptyDashboardWidgetData = {
+  kpi: { kind: 'kpi' as const, label: 'No result' },
+  series: { kind: 'series' as const, points: [] },
+  table: { kind: 'table' as const, columns: dummyDashboardTable.columns, rows: [] },
+};
+
 export const dummyNotifications: DummyNotification[] = [
   {
     id: 'noti-1',

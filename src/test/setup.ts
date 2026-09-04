@@ -17,3 +17,12 @@ Object.defineProperty(window, 'IntersectionObserver', {
     unobserve: vi.fn(),
   })),
 });
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: class ResizeObserverMock {
+    observe = vi.fn();
+    disconnect = vi.fn();
+    unobserve = vi.fn();
+  },
+});

@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
+import { hasBeenRetried, markRetried, RefreshSingleFlight } from './refreshSingleFlight';
 import { createApiEnvelopeDto } from './ApiEnvelope.dto';
 import { parseDto } from './validation';
 import { analytics } from '@core/analytics/analytics';
@@ -10,6 +11,26 @@ let tokenProvider: TokenProvider = () => null;
 
 export function setAccessTokenProvider(provider: TokenProvider) {
   tokenProvider = provider;
+}
+
+/**
+ * Exchanges the refresh cookie for a new access token, or returns null.
+ *
+ * Registered from the outside for the same reason the token provider is: this
+ * module must not import the auth feature, or `core` would depend on
+ * `features` and every test touching the api client would drag the auth store
+ * in with it.
+ *
+ * Until something registers one, a 401 is simply a 401 — which is what shipped:
+ * `RefreshSingleFlight` existed and was unit-tested, but nothing called it, so
+ * every session ended silently when its access token expired.
+ */
+type TokenRefresher = () => Promise<string | null>;
+
+let refreshRunner: RefreshSingleFlight | null = null;
+
+export function setTokenRefresher(refresher: TokenRefresher | null) {
+  refreshRunner = refresher ? new RefreshSingleFlight(refresher) : null;
 }
 
 const http = axios.create({
@@ -34,8 +55,30 @@ http.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
+    const config = error.config;
+
+    /**
+     * One retry, and only for a 401 on a request that has not already been
+     * retried. The flag is what stops a revoked session from looping: refresh,
+     * 401, refresh, forever.
+     *
+     * The refresh itself is single-flighted. Five requests failing together
+     * must not send five refreshes — with a rotating token the four that lose
+     * the race present a spent one, which the server reads as a replay and
+     * answers by revoking the whole family.
+     */
+    if (status === 401 && refreshRunner && config && !hasBeenRetried(config)) {
+      const token = await refreshRunner.run();
+
+      if (token) {
+        markRetried(config);
+        config.headers.Authorization = `Bearer ${token}`;
+        return http.request(config);
+      }
+    }
+
     throw new TypedApiError({
       origin: error.response ? 'backend' : 'network',
       kind: status === 401 ? 'auth' : status === 404 ? 'not-found' : status && status >= 500 ? 'server' : 'unknown',

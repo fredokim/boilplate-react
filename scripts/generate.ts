@@ -39,13 +39,16 @@ if (kind === 'layout' || kind === 'page' || kind === 'form') {
   process.exit(result.status ?? 1);
 }
 
+// Delegated, not inlined. This branch used to hold its own copy of feature
+// generation that made two files and three empty directories, so
+// `generate -- feature x` and `generate:feature -- x` produced different
+// results and only one of them followed FEATURE_CONTRACT.md.
 if (kind === 'feature') {
-  const base = `src/features/${kebabName}`;
-  for (const dir of ['api', 'containers', 'dto', 'hooks', 'views']) {
-    mkdirSync(join(process.cwd(), base, dir), { recursive: true });
-  }
-  write(`${base}/dto/${pascalName}.dto.ts`, `import { IsString } from 'class-validator';\n\nexport class ${pascalName}Dto {\n  @IsString()\n  id = '';\n}\n`);
-  write(`${base}/views/${pascalName}View.tsx`, `export function ${pascalName}View() {\n  return <section>${pascalName}</section>;\n}\n`);
+  const result = spawnSync('tsx', ['scripts/generate-feature.ts', rawName, ...process.argv.slice(4)], {
+    stdio: 'inherit',
+    shell: true,
+  });
+  process.exit(result.status ?? 1);
 }
 
 if (kind === 'component') {

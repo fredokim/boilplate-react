@@ -1,0 +1,26 @@
+# Render blueprint for the React client.
+#
+# A Docker service rather than a static site: the app and the shared backend
+# have to look like one origin to the browser (the refresh cookie is sameSite
+# lax), and the two realtime gateways under /api are WebSockets. A static host
+# that rewrites HTTP would serve the app and break exactly those features.
+# The image is Caddy in front of the build; see Caddyfile.
+
+services:
+  - type: web
+    name: react-boilerplate
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+
+    envVars:
+      - key: PORT
+        value: 8080
+
+      # The backend service's own URL. Caddy fails to start without it, which
+      # is deliberate -- a default would let /api fall through to index.html.
+      # Whatever is set here must also appear in the backend's CORS_ORIGINS as
+      # this site's origin, because the WebSocket handshake checks it.
+      - key: BACKEND_ORIGIN
+        sync: false

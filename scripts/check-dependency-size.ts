@@ -10,7 +10,22 @@ const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const frameworkPackages = new Set(['react', 'react-dom']);
 const defaultMaxBytes = 6 * 1024 * 1024;
 const frameworkMaxBytes = 80 * 1024 * 1024;
+
+// DEPENDENCY_STRATEGY.md says an oversized runtime dependency needs a written reason.
+// Raising a cap here is therefore only half of it: the package must also be named in
+// that document, so the exception cannot be granted silently.
+const documentedExceptions = new Map<string, number>([['hls.js', 40 * 1024 * 1024]]);
+const strategyDoc = existsSync(join(root, 'DEPENDENCY_STRATEGY.md'))
+  ? readFileSync(join(root, 'DEPENDENCY_STRATEGY.md'), 'utf8')
+  : '';
+
 const failures: string[] = [];
+
+for (const name of documentedExceptions.keys()) {
+  if (!strategyDoc.includes(name)) {
+    failures.push(`${name} has a raised size cap but no reason recorded in DEPENDENCY_STRATEGY.md.`);
+  }
+}
 
 function packagePath(packageName: string) {
   if (packageName.startsWith('@')) {
@@ -32,7 +47,9 @@ const rows = Object.keys(packageJson.dependencies ?? {})
   .map((name) => {
     const path = packagePath(name);
     const size = existsSync(path) ? directorySize(path) : 0;
-    const max = frameworkPackages.has(name) ? frameworkMaxBytes : defaultMaxBytes;
+    const max = frameworkPackages.has(name)
+      ? frameworkMaxBytes
+      : (documentedExceptions.get(name) ?? defaultMaxBytes);
 
     if (size > max) {
       failures.push(`${name} is ${(size / 1024 / 1024).toFixed(2)}MB, max ${(max / 1024 / 1024).toFixed(0)}MB.`);

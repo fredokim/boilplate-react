@@ -4,7 +4,7 @@ import { LoadingState } from '@/components/states/LoadingState';
 import { AppShell } from './AppShell';
 import { useRouteAnalytics } from '@hooks/useRouteAnalytics';
 import { useScrollMemory } from '@hooks/useScrollMemory';
-import { appRoutes, createRouteElement } from './routeRegistry';
+import { routeElements } from './routeRegistry';
 
 export function AppRouter() {
   useRouteAnalytics();
@@ -14,8 +14,8 @@ export function AppRouter() {
     <AppShell>
       <Suspense fallback={<LoadingState label="Loading page" />}>
         <Routes>
-          {appRoutes.map((route) => (
-            <Route element={createRouteElement(route)} key={route.path} path={route.path} />
+          {routeElements.map((route) => (
+            <Route element={route.element} key={route.path} path={route.path} />
           ))}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

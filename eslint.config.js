@@ -6,7 +6,9 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'storybook-static', 'node_modules'] },
+  // server/ is a separate npm package with its own eslint config and tsconfig.
+  // The lint script's glob already excludes it; this keeps a bare `eslint .` honest too.
+  { ignores: ['dist', 'storybook-static', 'node_modules', 'server'] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
