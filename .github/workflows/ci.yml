@@ -76,7 +76,13 @@ jobs:
 
       - name: Serve the app, a deep link, and the proxied API
         run: |
+          # --security-opt no-new-privileges reproduces how Render starts a
+          # container. Without it this job ran the image under strictly weaker
+          # rules than production and passed while the deploy failed at exec:
+          # the caddy binary carries a file capability, and no-new-privileges
+          # turns execve() of such a file into EPERM.
           docker run -d --name site --network web -p 8080:8080 \
+            --security-opt no-new-privileges:true \
             -e BACKEND_ORIGIN=http://upstream:80 react-boilerplate:ci
           for i in $(seq 1 30); do
             curl -fsS http://127.0.0.1:8080/ > /dev/null && break

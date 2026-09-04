@@ -26,6 +26,22 @@ RUN npm run build
 
 FROM caddy:2-alpine AS runtime
 
+# The base image puts cap_net_bind_service on /usr/bin/caddy so it can bind
+# port 80 without root. Render starts containers with no-new-privileges, and
+# execve() of a file carrying file capabilities fails with EPERM under that
+# flag: the container never starts, and the only output is
+#
+#   exec /usr/bin/caddy: operation not permitted
+#
+# Copying the binary drops the capability -- busybox cp does not carry xattrs --
+# and nothing here wants it, because this listens on 8080 rather than on a
+# privileged port. The original is removed so there is one binary, not two that
+# differ in a way nobody would think to check.
+RUN cp /usr/bin/caddy /usr/local/bin/caddy && rm /usr/bin/caddy
+
+ENTRYPOINT ["/usr/local/bin/caddy"]
+CMD ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv
 
