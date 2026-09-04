@@ -7,8 +7,13 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
+# No --ignore-scripts here. esbuild resolves its platform binary from a
+# postinstall, and skipping it makes `vite build` fail with a missing binary --
+# in one of these repos and not the other, purely because their esbuild
+# versions differ in whether they still need that script. A build stage that
+# depends on which minor version happens to be pinned is not a build stage.
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 COPY . .
 
