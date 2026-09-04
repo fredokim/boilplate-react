@@ -25,14 +25,21 @@
 next에만 있는 토큰: `--color-primary-strong`, `--space-5`, `--space-10`,
 `--radius-lg`, 그리고 `shadow.css` 파일 전체.
 
-vue는 아예 다른 네임스페이스를 쓴다. `src/assets/scss/design-system.scss`
-에 `--ds-color-neutral-0` 부터 `--ds-color-neutral-900` 까지의 계조를 두고,
-`src/core/theme/theme.ts`의 `applyTheme`는 런타임에 `--color-${key}` 형태로
-변수를 덮어쓴다. 두 네이밍이 한 저장소 안에 공존한다.
+vue는 두 계층을 나눠 쓴다. `--ds-`는 디자인 토큰(radius, shadow, spacing,
+typography, zIndex)이고 `--color-`는 테마 색이다. 의도된 구조이며 결함이
+아니다.
 
-즉 "공통 디자인 시스템"이라고 말하고 있지만 실제로는 세 벌의 서로 다른
-팔레트가 각자 표류하고 있다. 이 작업의 목적은 값을 통일하는 것이 아니라,
-**값이 갈라질 수 없는 구조**를 만드는 것이다.
+그리고 **vue에는 이미 생성기가 있다.** `src/core/theme/tokens.ts`가 소스이고
+`scripts/generate-theme-scss.ts`가 `src/assets/scss/generated/theme.scss`를
+만들며, `package.json`의 `predev`, `prestorybook`, `check:ci`가 이를 실행한다.
+라이트/다크 두 벌도 이미 있다.
+
+따라서 이 작업은 파이프라인을 새로 만드는 것이 아니라, **vue에 있는 것을
+react와 next로 확장하고 세 저장소가 같은 소스를 보게 만드는 일**이다.
+목적은 값을 한 번 맞추는 것이 아니라 **값이 갈라질 수 없는 구조**를 만드는
+것이다.
+
+자세한 현황은 `TOKEN_INVENTORY.md`에 있다. 1-1단계에서 작성했다.
 
 ---
 
@@ -92,8 +99,14 @@ vue는 아예 다른 네임스페이스를 쓴다. `src/assets/scss/design-syste
 2. 값은 단계 1-1의 표에서 가져온다. 값이 갈라진 토큰은 **react 값을 채택**
    한다. react가 가장 많은 화면에서 실제로 쓰이고 있어 회귀 위험이 가장 낮다.
    단, 채택하지 않은 값을 주석이 아니라 `TOKEN_INVENTORY.md`에 남긴다.
-3. next에만 있던 토큰(`--color-primary-strong`, `--space-5`, `--space-10`,
-   `--radius-lg`, `--shadow-sm`)은 전부 소스에 포함한다. 지우면 next가 깨진다.
+3. 한 저장소에만 있는 토큰을 전부 포함한다. 지우면 그 저장소가 깨진다.
+   - next 전용 5개: `--color-primary-strong`, `--space-5`, `--space-10`,
+     `--radius-lg`, `--shadow-sm`
+   - vue 전용 40개: `--ds-` 계열 디자인 토큰(radius, shadow, spacing,
+     typography, zIndex)과 `--ds-color-neutral-*` 계조, `--ds-focus-ring`.
+     이들은 `vue-boilerplate/src/core/theme/tokens.ts`에 이미 구조화되어
+     있으므로 그 구조를 그대로 가져온다.
+   - react 전용은 없다.
 4. 계층은 두 단계로 둔다. 원시값(`color.blue.600`)과 의미값
    (`color.primary` → `{color.blue.600}` 참조). 의미값만 컴포넌트가 참조한다.
    다크 테마는 원시값을 그대로 두고 의미값의 참조만 바꾸는 것으로 처리한다.
@@ -190,11 +203,13 @@ vue는 네임스페이스가 달라 가장 위험하다. 나눠서 진행한다.
 1. 먼저 `--ds-color-neutral-*` 계조를 `tokens.json`의 원시값으로 편입한다.
    vue가 쓰는 9단계 중립색은 react/next에 대응물이 없으므로 지우지 말고
    원시값 계층에 추가한다.
-2. 생성기에 vue용 출력을 추가한다. vue의 기존 파일 경로와 변수 이름을
-   그대로 유지한다. 즉 vue는 당분간 `--ds-` 접두사를 계속 쓴다.
-3. `applyTheme`가 덮어쓰는 `--color-${key}` 변수와 생성된 변수의 이름이
-   충돌하는지 확인한다. 충돌하면 어느 쪽이 이기는지 브라우저에서 확인하고
-   결과를 문서에 적는다. 추측으로 넘어가지 않는다.
+2. vue는 이미 `scripts/generate-theme-scss.ts`를 갖고 있다. 새 생성기로
+   교체할지, 기존 생성기가 새 소스를 읽게 할지 판단한다. 후자가 변경 범위가
+   작다. 어느 쪽이든 출력 경로와 변수 이름, 유틸리티 클래스 83개는 그대로
+   유지한다.
+3. `applyTheme`는 인라인 스타일로 `--color-*`를 쓰고, 같은 값이
+   `:root[data-theme]` 규칙으로도 적용된다. 두 경로가 같은 정보를 중복해서
+   들고 있다. 이번에 정리할지 남길지 판단하고, 남긴다면 이유를 적는다.
 
 완료 조건:
 
@@ -207,10 +222,34 @@ vue는 네임스페이스가 달라 가장 위험하다. 나눠서 진행한다.
 
 ---
 
+## 단계 1-6b — vue의 쓰이지 않는 생성기 복제본을 처리한다
+
+1-1단계에서 발견한 것이다. `vue-boilerplate/scripts/generate-theme-scss.js`는
+22줄이고 `.ts`는 56줄이다. `.js`는 `--color-*`만 출력하고 `--ds-*` 계열
+31개를 전혀 만들지 않는다. `package.json`은 `.ts`만 부르며 `.js`를 참조하는
+곳은 없다.
+
+지시:
+
+1. `.js`가 정말 어디에서도 참조되지 않는지 다시 확인한다.
+2. 참조가 없으면 삭제한다. 남겨둘 이유가 있으면 그 이유를 파일 상단에 적고,
+   실행 시 경고를 출력하게 한다.
+
+완료 조건:
+
+- 삭제 후 vue의 `check:ci`가 통과한다.
+- 생성물이 삭제 전과 동일하다.
+
+지금은 무해하지만, 누군가 `node scripts/generate-theme-scss.js`를 실행하면
+디자인 토큰 31개가 조용히 빠진 파일이 만들어진다.
+
+---
+
 ## 단계 1-7 — 다크 테마 확장 지점을 정의한다
 
-지금 세 저장소 모두 라이트 테마 단일이다. 이번에 다크 테마를 구현하지는
-않되, 나중에 추가할 때 토큰 구조를 바꾸지 않아도 되게 만든다.
+vue는 이미 다크 테마를 갖고 있고 react와 next는 없다. 이번에 react/next의
+다크 값을 채우지는 않되, 나중에 추가할 때 토큰 구조를 바꾸지 않아도 되게
+만든다. vue의 `lightTheme`/`darkTheme` 구조가 참고 대상이다.
 
 지시:
 
