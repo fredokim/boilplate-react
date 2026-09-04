@@ -1,3 +1,4 @@
+import { watchForIdle } from '@core/realtime/idleSuspension';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { GraphDocument, GraphMetadata } from '../model/graph';
 import { TopologyRealtimeController } from './controller';
@@ -43,6 +44,21 @@ export function useTopologyRealtime<
   }, [controller, transport]);
 
   useEffect(() => store.setMonitoredNode(selectedNodeId), [selectedNodeId, store]);
+
+  /**
+   * Hands the socket back when nobody is watching.
+   *
+   * `stop()` and `start()` rather than a new pair of methods: stop already
+   * disconnects and blocks the reconnect backoff, and start resubscribes and
+   * resyncs from a fresh snapshot -- which is what a viewer who has been away
+   * needs anyway, since the retention window may have moved past them.
+   */
+  useEffect(() => {
+    return watchForIdle({
+      onIdle: () => controller.stop(),
+      onResume: () => void controller.start(),
+    });
+  }, [controller]);
 
   useEffect(() => {
     const onVisibility = () => controller.setHidden(document.hidden);

@@ -1,3 +1,4 @@
+import { watchForIdle } from '@core/realtime/idleSuspension';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ChatController } from '../realtime/chatController';
 import { ChatStore, type ChatStoreOptions } from '../realtime/chatStore';
@@ -32,6 +33,21 @@ export function useRealtimeChat({ roomId, store: storeOptions, transport }: UseR
     const onVisibility = () => controller.setHidden(document.hidden);
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [controller]);
+
+  /**
+   * Hands the socket back when nobody is watching.
+   *
+   * `stop()` and `start()` rather than a new pair of methods: stop already
+   * disconnects, clears the timers, and blocks the reconnect backoff, and start
+   * rejoins from the last applied sequence. An abandoned tab therefore stops
+   * costing anything, and a returning reader catches up rather than reloading.
+   */
+  useEffect(() => {
+    return watchForIdle({
+      onIdle: () => controller.stop(),
+      onResume: () => void controller.start(),
+    });
   }, [controller]);
 
   return {
