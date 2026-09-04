@@ -1,0 +1,66 @@
+name: Storybook Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: storybook-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Pages has to be enabled on the repository before this runs. The workflow
+      # cannot do it for itself: `enablement: true` calls the create API, which
+      # needs admin rights, and GITHUB_TOKEN does not have them -- `pages: write`
+      # above grants deploying to an existing site, not creating one. It answers:
+      #
+      #   Create Pages site failed. Resource not accessible by integration
+      #
+      # One-time setup, by someone with admin on the repository:
+      #
+      #   gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: storybook-static
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
