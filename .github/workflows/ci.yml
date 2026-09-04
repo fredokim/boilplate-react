@@ -18,11 +18,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # These three are in `check:ci` and were not in this workflow, so the
+      # token gate and the generator gate -- the two things plan items 1 and 2
+      # exist to enforce -- never ran on a pull request. A gate nobody runs is
+      # a gate that does not exist.
+      - run: npm run check:tokens
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
       - run: npm run check:ai
       - run: npm run check:automation
+      - run: npm run check:generators
+      - run: npm run check:deps
       - run: npm run build
       - run: npm run check:bundle
       - run: npm run build-storybook
