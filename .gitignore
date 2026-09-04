@@ -25,3 +25,9 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+
+# Reports produced by the coverage and Lighthouse gates. Regenerated on every
+# run, and a checked-in copy only ever disagrees with the current one.
+coverage/
+.lighthouseci/
+reports/

@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,scripts,.storybook}/**/*.{ts,tsx,js}\" --max-warnings=0",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "storybook": "cross-env STORYBOOK_DISABLE_TELEMETRY=1 storybook dev -p 6007",
@@ -31,7 +32,9 @@
     "check:all": "npm run check:ci && npm run check:contract",
     "check:contract": "vitest run src/test/contract",
     "dev:server-mode": "cross-env VITE_DATA_MODE=server npm run dev",
-    "contract:sync": "node -e \"require('node:fs').copyFileSync(process.env.SERVER_REPO ? process.env.SERVER_REPO + '/openapi.json' : '../boilplate-server/openapi.json', 'contracts/openapi.json')\""
+    "contract:sync": "node -e \"require('node:fs').copyFileSync(process.env.SERVER_REPO ? process.env.SERVER_REPO + '/openapi.json' : '../boilplate-server/openapi.json', 'contracts/openapi.json')\"",
+    "preperf:lighthouse": "cross-env VITE_DATA_MODE=server npm run build",
+    "perf:lighthouse": "npx -y @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -44,6 +47,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.7",
     "autoprefixer": "^10.5.0",
     "axe-core": "^4.11.4",
     "concurrently": "^9.2.4",

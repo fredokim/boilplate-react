@@ -25,7 +25,9 @@ jobs:
       - run: npm run check:tokens
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test
+      # The coverage variant runs the same tests and then enforces the
+      # thresholds. Running both would run every test twice for nothing.
+      - run: npm run test:coverage
       - run: npm run check:ai
       - run: npm run check:automation
       - run: npm run check:generators
@@ -33,6 +35,12 @@ jobs:
       - run: npm run build
       - run: npm run check:bundle
       - run: npm run build-storybook
+      # Lighthouse. Accessibility and best-practices are asserted as errors;
+      # performance stays a warning because it is wall-clock timing on a
+      # shared runner. Every assertion used to be a warning, which meant the
+      # run could not fail -- and it was never in this workflow at all, so
+      # nothing noticed that it was auditing a build that refuses to boot.
+      - run: npm run perf:lighthouse
       # The e2e suite was never wired into CI, and a router bug that left the
       # first page a user sees completely blank went unnoticed because of it:
       # every other gate was green throughout. Unit tests render components in
