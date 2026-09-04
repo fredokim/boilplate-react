@@ -28,20 +28,10 @@
     "generate:layout": "tsx scripts/generate-layout.ts",
     "generate:page": "tsx scripts/generate-page.ts",
     "generate:feature": "tsx scripts/generate-feature.ts",
-    "server:dev": "npm --prefix server run start:dev",
-    "server:build": "npm --prefix server run build",
-    "server:lint": "npm --prefix server run lint",
-    "server:typecheck": "npm --prefix server run typecheck",
-    "server:test": "npm --prefix server run test",
-    "server:test:e2e": "npm --prefix server run test:e2e",
-    "server:openapi": "npm --prefix server run openapi:generate",
-    "server:prisma:validate": "npm --prefix server run prisma:validate",
-    "server:check": "npm --prefix server run check",
-    "dev:all": "concurrently -n web,api -c cyan,magenta \"npm run dev\" \"npm run server:dev\"",
-    "check:all": "npm run check:ci && npm run server:check && npm run check:contract",
-    "server:openapi:check": "npm --prefix server run openapi:check",
+    "check:all": "npm run check:ci && npm run check:contract",
     "check:contract": "vitest run src/test/contract",
-    "dev:server-mode": "cross-env VITE_DATA_MODE=server npm run dev"
+    "dev:server-mode": "cross-env VITE_DATA_MODE=server npm run dev",
+    "contract:sync": "node -e \"require('node:fs').copyFileSync(process.env.SERVER_REPO ? process.env.SERVER_REPO + '/openapi.json' : '../boilplate-server/openapi.json', 'contracts/openapi.json')\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

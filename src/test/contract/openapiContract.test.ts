@@ -17,7 +17,20 @@ import { describe, expect, it } from 'vitest';
  * it stays true.
  */
 
-const SPEC_PATH = resolve(__dirname, '../../../server/openapi.json');
+/**
+ * A copy of the backend's published spec, kept in this repository.
+ *
+ * The server used to be a sibling directory; it is now its own repository
+ * shared by three frontends, so the spec is vendored rather than read across a
+ * path that no longer exists. `npm run contract:sync` refreshes it from a local
+ * checkout of boilplate-server.
+ *
+ * The cost of vendoring is stated plainly: this copy can fall behind the server
+ * without anything here noticing. What it still catches is the failure it was
+ * written for — the frontend calling an endpoint that the spec it was built
+ * against does not describe.
+ */
+const SPEC_PATH = resolve(__dirname, '../../../contracts/openapi.json');
 
 type OpenApiDocument = {
   paths: Record<string, Record<string, unknown>>;
