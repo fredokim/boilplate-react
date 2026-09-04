@@ -49,3 +49,55 @@ jobs:
       # built for. Whether that copy is current is a separate question, and
       # `npm run contract:sync` is how it gets refreshed.
       - run: npx vitest run src/test/contract
+
+  # The deployment artifact. A Vite proxy is a dev-server feature and does not
+  # survive `vite build`, so until this existed the production story was a
+  # static bundle whose every /api call would have 404'd -- and no gate would
+  # have said so, because every gate runs against the dev server or jsdom.
+  #
+  # This builds the image and asserts the three things the deployment depends
+  # on: the app is served, a deep link is a client route rather than a 404, and
+  # /api reaches the upstream instead of falling through to index.html. The
+  # last one is the one that matters: a 200 full of HTML is what a missing
+  # proxy looks like, and it fails later at DTO validation rather than here.
+  deploy-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stand up a stub backend to proxy to
+        run: |
+          docker network create web
+          docker run -d --name upstream --network web -p 9099:80 \
+            -v "$PWD/.github/stub:/usr/share/nginx/html:ro" nginx:alpine
+
+      - name: Build the image
+        run: docker build -t react-boilerplate:ci .
+
+      - name: Serve the app, a deep link, and the proxied API
+        run: |
+          docker run -d --name site --network web -p 8080:8080 \
+            -e BACKEND_ORIGIN=http://upstream:80 react-boilerplate:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/ > /dev/null && break
+            sleep 1
+          done
+
+          echo "--- the app is served ---"
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root"' \
+            || { echo "index.html is not being served"; docker logs site; exit 1; }
+
+          echo "--- a deep link is a client route ---"
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/examples/graph)
+          [ "$code" = "200" ] || { echo "deep link returned $code"; exit 1; }
+
+          echo "--- /api reaches the upstream, not the SPA fallback ---"
+          body=$(curl -s http://127.0.0.1:8080/api/health/live)
+          echo "$body"
+          case "$body" in
+            *stub-upstream*) echo "the proxy is wired" ;;
+            *) echo "/api fell through to the SPA -- the proxy is not wired"; exit 1 ;;
+          esac
+
+          docker logs site
+          docker rm -f site upstream

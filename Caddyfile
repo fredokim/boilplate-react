@@ -1,0 +1,35 @@
+{
+	admin off
+	# TLS is terminated by the platform in front of this container.
+	auto_https off
+}
+
+:{$PORT:8080} {
+	encode gzip
+
+	# The refresh token is an HttpOnly cookie with sameSite lax, so the browser
+	# has to see a single origin or it simply never sends it: sign-in appears to
+	# work and the session ends the moment the access token expires. The Vite
+	# proxy provides this in development; in production it is this block.
+	#
+	# reverse_proxy upgrades WebSockets transparently, which the two gateways
+	# under /api (topology and live chat) depend on. A static host that only
+	# rewrites HTTP would serve the app and break exactly the features worth
+	# showing.
+	handle /api/* {
+		reverse_proxy {$BACKEND_ORIGIN} {
+			# Render routes by Host, so the upstream's own hostname has to be
+			# sent rather than this site's. Without it every request comes back
+			# as the platform's 404, not the backend's.
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	handle {
+		root * /srv
+		# A deep link is a client route, not a file. Without this, reloading on
+		# /examples/graph is a 404 from the file server.
+		try_files {path} /index.html
+		file_server
+	}
+}
