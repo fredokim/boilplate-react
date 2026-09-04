@@ -41,7 +41,7 @@ npm run generate -- page orders list
 
 ## Added Architecture Standards
 
-- Generator: `feature`, `component`, `dto`, and `hook` scaffolds.
+- Generator: `feature`, `component`, and `dto` scaffolds. A generated feature is reachable, tested, and covered by `check:generators`.
 - Component generator creates the component, story, and focused test.
 - Contract generator creates DTO, form schema, state schema, mock data, and validation test.
 - Form generator creates a props-only form view, Storybook stories, and a focused render test from the inferred schema type.
@@ -256,3 +256,23 @@ enough to produce the block.
 `TOKEN_INVENTORY.md` in the React repository records what the three sets looked
 like before they were merged, including two tokens that were deliberately not
 merged.
+
+## Feature generator
+
+```bash
+npm run generate:feature -- billing-report          # view, story, test, container, route
+npm run generate:feature -- billing-report --api    # ...plus api module, DTO, and query hook
+```
+
+`FEATURE_CONTRACT.md` records what a generated feature contains and why, derived
+from the features that already exist rather than invented.
+
+The api module is behind `--api` because a generated one calls a URL derived
+from the feature name, and `npm run check:contract` reads those URLs and
+compares them against the server's published spec — so scaffolding with an api
+module turns the contract check red immediately. Asking for it makes that a
+choice rather than a surprise.
+
+`npm run check:generators` runs the generator and checks its output against the
+contract; it is part of `check:ci`. Regenerating over an existing feature
+refuses rather than overwriting.
