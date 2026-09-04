@@ -12,11 +12,26 @@
 
 | 파일 | 확장 계획 | 상태 |
 | --- | --- | --- |
-| `PLAN_01_DESIGN_TOKENS.md` | 1번 · 디자인 토큰 | 미착수 |
-| `PLAN_02_GENERATOR.md` | 2번 · 생성기 | 미착수 |
+| `PLAN_01_DESIGN_TOKENS.md` | 1번 · 디자인 토큰 | 완료 |
+| `PLAN_02_GENERATOR.md` | 2번 · 생성기 | 완료 |
 
-3번(프로덕션 인증)은 백엔드 작업으로 상당 부분 대체되었으므로, 남은
-범위를 다시 정의한 뒤에 프롬프트를 쓴다.
+3번(프로덕션 인증)은 demo session을 실제 서버 인증으로 교체하는 부분이
+끝났고, 외부 IdP와 MFA가 남아 있다. 백엔드 구현 시 의도적으로 제외한
+범위이며, 남은 것을 다시 정의한 뒤에 프롬프트를 쓴다.
+
+## 다른 저장소의 프롬프트
+
+백엔드는 `fredokim/boilplate-server`로 분리되었고 세 프론트가 공유한다.
+vue와 next를 연동하는 프롬프트는 작업이 일어나는 저장소에 둔다.
+
+| 저장소 | 파일 | 상태 |
+| --- | --- | --- |
+| vue-boilerplate | `prompts/CONNECT_BACKEND.md` | 미착수 |
+| next-boilerplate | `prompts/CONNECT_BACKEND.md` | 미착수 |
+
+두 문서는 서로 다르다. vue는 HTTP 클라이언트가 이미 있고 DTO가 서버 계약과
+어긋나며, next는 자기 `/api/*` 라우트 핸들러가 곧 mock 백엔드라 그것을
+프록시로 바꾸는 결정이 먼저다.
 
 ## 쓰는 방법
 
