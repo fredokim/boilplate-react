@@ -23,6 +23,10 @@ jobs:
       # exist to enforce -- never ran on a pull request. A gate nobody runs is
       # a gate that does not exist.
       - run: npm run check:tokens
+      # Fails when a document names an npm script or a repository path that does
+      # not exist. The README described a server directory that had moved to its
+      # own repository for weeks, and nothing noticed.
+      - run: npm run check:docs
       - run: npm run lint
       - run: npm run typecheck
       # The coverage variant runs the same tests and then enforces the

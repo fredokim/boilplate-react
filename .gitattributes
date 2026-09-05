@@ -1,0 +1,5 @@
+# The contract test and the drift check read this file as it comes out of the
+# server's generator, which writes LF. Pinning it keeps a Windows checkout from
+# rewriting every line and producing a five-thousand-line diff that has nothing
+# to do with the API.
+contracts/openapi.json text eol=lf
