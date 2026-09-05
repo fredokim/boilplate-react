@@ -5,6 +5,7 @@ import { describeFailure, failureKeyOf, failureStatus, type FailureKey } from '.
 const ALL: FailureKey[] = [
   'offline',
   'unreachable',
+  'waking',
   'timeout',
   'unauthorized',
   'forbidden',
@@ -29,6 +30,21 @@ describe('failureStatus', () => {
       expect(status.detail).toBeTruthy();
       expect(['warning', 'error']).toContain(status.tone);
     }
+  });
+
+  /**
+   * A host refusing to wake a sleeping instance is not a lost connection, and
+   * it is the only failure here that fixes itself while the reader waits. It
+   * used to fall through to `unknown` -- "The cause is not known" -- which is
+   * the one thing that was not true about it.
+   */
+  it('says a sleeping server is starting rather than unknown', () => {
+    const key = failureKeyOf({ origin: 'network', kind: 'waking', message: '', status: 429 });
+
+    expect(key).toBe('waking');
+    expect(failureStatus(key).tone).toBe('warning');
+    expect(failureStatus(key).retryable).toBe(true);
+    expect(failureStatus(key).detail).toMatch(/minute/i);
   });
 
   it('does not offer a retry that cannot work', () => {

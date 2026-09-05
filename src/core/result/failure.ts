@@ -1,5 +1,5 @@
 export type FailureOrigin = 'frontend' | 'backend' | 'network' | 'unknown';
-export type FailureKind = 'validation' | 'auth' | 'not-found' | 'server' | 'timeout' | 'unknown';
+export type FailureKind = 'waking' | 'validation' | 'auth' | 'not-found' | 'server' | 'timeout' | 'unknown';
 
 export type AppFailure = {
   origin: FailureOrigin;

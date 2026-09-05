@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
 import { hasBeenRetried, markRetried, RefreshSingleFlight } from './refreshSingleFlight';
+import { ASLEEP_STATUS, serverWakeGate } from './serverWake';
 import { createApiEnvelopeDto } from './ApiEnvelope.dto';
 import { parseDto } from './validation';
 import { analytics } from '@core/analytics/analytics';
@@ -38,7 +39,12 @@ const http = axios.create({
   timeout: 10_000,
 });
 
-http.interceptors.request.use((config) => {
+http.interceptors.request.use(async (config) => {
+  // Free of charge unless the server is known to be asleep, in which case this
+  // waits for the one probe rather than adding another request to a pile the
+  // platform is already refusing.
+  await serverWakeGate.wait();
+
   const token = tokenProvider();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -77,6 +83,27 @@ http.interceptors.response.use(
         config.headers.Authorization = `Bearer ${token}`;
         return http.request(config);
       }
+    }
+
+    /**
+     * A 429 with no envelope did not come from the API. This app's own 429s --
+     * the login throttle and the chat rate limit -- are JSON like every other
+     * answer, so a body that is not one means the host refused to wake a
+     * sleeping instance.
+     */
+    const body: unknown = error.response?.data;
+    const asleep = status === ASLEEP_STATUS && (typeof body !== 'object' || body === null);
+
+    if (asleep) {
+      serverWakeGate.reportAsleep();
+
+      throw new TypedApiError({
+        origin: 'network',
+        kind: 'waking',
+        message: 'The server was idle and is starting.',
+        status,
+        details: body,
+      });
     }
 
     throw new TypedApiError({

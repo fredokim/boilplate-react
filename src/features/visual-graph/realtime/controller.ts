@@ -10,6 +10,18 @@ export type RealtimeControllerOptions = {
   flushIntervalMs?: number;
   hiddenFlushIntervalMs?: number;
   reconnectBaseMs?: number;
+  /**
+   * The base used until the socket has opened once.
+   *
+   * A drop after a working connection is usually a blip and deserves a fast
+   * retry. A handshake that has never succeeded is a different situation --
+   * most often a host that has not finished waking the server -- and retrying
+   * it four times in seven seconds is what makes the platform refuse to wake it
+   * at all.
+   */
+  coldReconnectBaseMs?: number;
+  /** Awaited before each connect, so a burst becomes one wake-up attempt. */
+  waitForServer?: () => Promise<void>;
   reconnectMaxMs?: number;
   random?: () => number;
 };
@@ -18,6 +30,8 @@ export class TopologyRealtimeController {
   private readonly flushIntervalMs: number;
   private readonly hiddenFlushIntervalMs: number;
   private readonly reconnectBaseMs: number;
+  private readonly coldReconnectBaseMs: number;
+  private hasConnected = false;
   private readonly reconnectMaxMs: number;
   private readonly random: () => number;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -36,6 +50,7 @@ export class TopologyRealtimeController {
     this.flushIntervalMs = options.flushIntervalMs ?? 50;
     this.hiddenFlushIntervalMs = options.hiddenFlushIntervalMs ?? 250;
     this.reconnectBaseMs = options.reconnectBaseMs ?? 1_000;
+    this.coldReconnectBaseMs = options.coldReconnectBaseMs ?? 8_000;
     this.reconnectMaxMs = options.reconnectMaxMs ?? 30_000;
     this.random = options.random ?? Math.random;
   }
@@ -44,6 +59,12 @@ export class TopologyRealtimeController {
     if (!this.manuallyStopped) return;
     this.manuallyStopped = false;
     this.suspended = false;
+    // A fresh episode. Having connected an hour ago says nothing about
+    // whether the server is up now -- and a resume after a long absence is the
+    // likeliest moment for it to be asleep, which is when the cold cadence
+    // matters most.
+    this.hasConnected = false;
+    this.reconnectAttempt = 0;
     this.unsubscribeEvent = this.options.transport.subscribe((event) => this.options.store.enqueue(event));
     this.unsubscribeConnection = this.options.transport.subscribeConnection((state) => this.handleConnection(state));
     this.startFlushTimer();
@@ -126,6 +147,7 @@ export class TopologyRealtimeController {
 
   private async connect() {
     try {
+      await this.options.waitForServer?.();
       await this.options.transport.connect(this.options.topologyId);
     } catch {
       this.scheduleReconnect();
@@ -136,6 +158,7 @@ export class TopologyRealtimeController {
     const wasConnected = this.connectionState === 'connected';
     this.setConnectionState(state);
     if (state === 'connected') {
+      this.hasConnected = true;
       this.clearReconnectTimer();
       if (this.reconnectAttempt > 0) {
         this.options.store.markReconnect();
@@ -150,7 +173,8 @@ export class TopologyRealtimeController {
   private scheduleReconnect() {
     if (this.manuallyStopped || this.reconnectTimer) return;
     this.setConnectionState('reconnecting');
-    const exponential = Math.min(this.reconnectMaxMs, this.reconnectBaseMs * 2 ** this.reconnectAttempt);
+    const base = this.hasConnected ? this.reconnectBaseMs : this.coldReconnectBaseMs;
+    const exponential = Math.min(this.reconnectMaxMs, base * 2 ** this.reconnectAttempt);
     const delay = Math.round(exponential * (0.8 + this.random() * 0.4));
     this.reconnectAttempt += 1;
     this.reconnectTimer = setTimeout(() => {

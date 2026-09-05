@@ -1,3 +1,4 @@
+import { serverWakeGate } from '@core/api/serverWake';
 import { watchForIdle } from '@core/realtime/idleSuspension';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ChatController } from '../realtime/chatController';
@@ -13,7 +14,7 @@ type UseRealtimeChatOptions = {
 export function useRealtimeChat({ roomId, store: storeOptions, transport }: UseRealtimeChatOptions) {
   const store = useMemo(() => new ChatStore(storeOptions), [storeOptions]);
   const controller = useMemo(
-    () => new ChatController({ roomId, transport, store }),
+    () => new ChatController({ roomId, transport, store, waitForServer: () => serverWakeGate.wait() }),
     [roomId, store, transport],
   );
 

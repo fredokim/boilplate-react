@@ -75,6 +75,82 @@ describe('ChatController', () => {
     });
   });
 
+  /**
+   * A handshake that has never succeeded usually means the host has not
+   * finished waking the server, and four attempts in seven seconds is what
+   * makes it refuse to wake at all. A drop after a working connection is a
+   * different thing and still retries quickly.
+   */
+  it('backs off further before the first connection than after a drop', async () => {
+    const attempt = vi.fn(() => Promise.reject(new Error('asleep')));
+    const controller = new ChatController({
+      roomId: 'room',
+      transport: new MockChatTransport({ handshakeMs: 10, messagesPerSecond: 0 }),
+      store: new ChatStore(),
+      reconnectBaseMs: 1_000,
+      coldReconnectBaseMs: 8_000,
+      random: () => 0.5,
+      waitForServer: attempt,
+    });
+
+    void controller.start();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(controller.getConnectionState()).toBe('reconnecting');
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    // The warm base of 1s would have tried again inside this window. The cold
+    // base of 8s must not have: a burst at a waking server is the thing that
+    // makes the host refuse to wake it.
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(attempt).toHaveBeenCalledTimes(2);
+
+    controller.stop();
+  });
+
+
+  /**
+   * The case the cold backoff is actually for.
+   *
+   * A tab is abandoned, the socket is released after a minute, and the reader
+   * comes back an hour later -- by which time a free instance has certainly
+   * gone to sleep. If having connected once, long ago, still counted, the
+   * resume would retry at the warm cadence and burst at a sleeping server: the
+   * exact thing this exists to prevent, in the likeliest situation for it.
+   */
+  it('treats a resume after a long absence as a cold start', async () => {
+    let asleep = false;
+    const attempt = vi.fn(() => (asleep ? Promise.reject(new Error('asleep')) : Promise.resolve()));
+    const controller = new ChatController({
+      roomId: 'room',
+      transport: new MockChatTransport({ handshakeMs: 10, messagesPerSecond: 0 }),
+      store: new ChatStore(),
+      reconnectBaseMs: 1_000,
+      coldReconnectBaseMs: 8_000,
+      random: () => 0.5,
+      waitForServer: attempt,
+    });
+
+    void controller.start();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(controller.getConnectionState()).toBe('connected');
+
+    controller.suspend();
+    asleep = true;
+    attempt.mockClear();
+    void controller.resume();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    // The warm base would have tried again inside this window.
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    controller.stop();
+  });
+
   it('connects and then applies buffered messages on the flush tick', async () => {
     const { controller, store, transport } = setup();
     void controller.start();
