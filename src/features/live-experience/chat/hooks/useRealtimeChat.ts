@@ -38,15 +38,16 @@ export function useRealtimeChat({ roomId, store: storeOptions, transport }: UseR
   /**
    * Hands the socket back when nobody is watching.
    *
-   * `stop()` and `start()` rather than a new pair of methods: stop already
-   * disconnects, clears the timers, and blocks the reconnect backoff, and start
+   * `suspend()` and `resume()` rather than stop and start: stop already
+   * disconnects and blocks the reconnect backoff, but lands on `disconnected` --
+   * the state that means a fault. Suspending says which happened; resuming
    * rejoins from the last applied sequence. An abandoned tab therefore stops
    * costing anything, and a returning reader catches up rather than reloading.
    */
   useEffect(() => {
     return watchForIdle({
-      onIdle: () => controller.stop(),
-      onResume: () => void controller.start(),
+      onIdle: () => controller.suspend(),
+      onResume: () => void controller.resume(),
     });
   }, [controller]);
 

@@ -1,3 +1,4 @@
+import { connectionStatus } from '@core/realtime/connectionStatus';
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ChatMessage } from '../model/chatMessage';
@@ -19,6 +20,9 @@ const PIN_THRESHOLD_PX = 24;
 const CHAT_VIEWPORT_HEIGHT_PX = 420;
 
 export const RealtimeChat = memo(function RealtimeChat({ connectionState, diagnostics, messages }: RealtimeChatProps) {
+  // The state names the code uses are not the words to show a reader.
+  const status = connectionStatus(connectionState);
+
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(pinned);
@@ -79,7 +83,13 @@ export const RealtimeChat = memo(function RealtimeChat({ connectionState, diagno
           <h2 className="m-0 text-lg font-bold text-ink">Live chat</h2>
           <p className="mb-0 mt-1 text-xs text-muted">Buffered, de-duplicated, and capped at {messages.length} shown</p>
         </div>
-        <span className={`live-chat__status live-chat__status--${connectionState}`}>{connectionState}</span>
+        <span
+          className={`live-chat__status live-chat__status--${status.tone}`}
+          role="status"
+          title={status.detail}
+        >
+          {status.label}
+        </span>
       </header>
 
       <div className="live-chat__viewport">

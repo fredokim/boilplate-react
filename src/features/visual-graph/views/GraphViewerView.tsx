@@ -1,3 +1,4 @@
+import { connectionStatus } from '@core/realtime/connectionStatus';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@ui/Button';
 import { Card } from '@ui/Card';
@@ -32,6 +33,17 @@ function formatMetadataValue(value: unknown): string {
   if (value === null || value === undefined) return '—';
   return JSON.stringify(value);
 }
+
+/**
+ * Three tones rather than "connected or not". A paused connection is working as
+ * intended and must not be dressed as a warning, which is what every state but
+ * `connected` used to get.
+ */
+const TONE_CLASS = {
+  ok: 'bg-green-100 text-green-800',
+  busy: 'bg-amber-100 text-amber-900',
+  bad: 'bg-red-100 text-red-900',
+} as const;
 
 export function GraphViewerView<TNodeType extends string, TNodeMetadata extends GraphMetadata, TEdgeMetadata extends GraphMetadata>({
   connectionState, getNodePresentation, graph, interaction, isNodeStale, onDestinationChange, onEdgeHover, onEdit, onNodeHover, onNodeSelect,
@@ -80,7 +92,13 @@ export function GraphViewerView<TNodeType extends string, TNodeMetadata extends 
           <p className="mt-2 text-sm text-muted">Search equipment, inspect metadata, and visualize routes calculated by an external engine.</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${connectionState === 'connected' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-900'}`} role="status">Realtime: {connectionState}</span>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${TONE_CLASS[connectionStatus(connectionState).tone]}`}
+            role="status"
+            title={connectionStatus(connectionState).detail}
+          >
+            Realtime: {connectionStatus(connectionState).label}
+          </span>
           <Button onClick={onEdit}>Edit topology</Button>
         </div>
       </div>

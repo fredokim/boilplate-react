@@ -1,6 +1,15 @@
 import type { ChatMessage } from '../model/chatMessage';
 
-export type ChatConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+export type ChatConnectionState =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  // Released deliberately, not lost. Kept apart from `disconnected` so the
+  // interface can say which happened.
+  | 'suspended'
+  | 'disconnected'
+  | 'error';
 
 export type Unsubscribe = () => void;
 

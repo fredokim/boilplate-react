@@ -25,6 +25,7 @@ export class TopologyRealtimeController {
   private unsubscribeEvent: (() => void) | null = null;
   private unsubscribeConnection: (() => void) | null = null;
   private manuallyStopped = true;
+  private suspended = false;
   private hidden = false;
   private reconnectAttempt = 0;
   private resyncGeneration = 0;
@@ -41,6 +42,7 @@ export class TopologyRealtimeController {
   async start() {
     if (!this.manuallyStopped) return;
     this.manuallyStopped = false;
+    this.suspended = false;
     this.unsubscribeEvent = this.options.transport.subscribe((event) => this.options.store.enqueue(event));
     this.unsubscribeConnection = this.options.transport.subscribeConnection((state) => this.handleConnection(state));
     this.startFlushTimer();
@@ -60,6 +62,26 @@ export class TopologyRealtimeController {
     this.unsubscribeConnection = null;
     this.options.transport.disconnect();
     this.connectionState = 'disconnected';
+  }
+
+  /**
+   * Releases the connection without calling it a failure.
+   *
+   * `stop()` would do the same work, but it lands on `disconnected` — the state
+   * that means something broke. Idle release is not a fault and must not read
+   * as one, so it has its own state and its own way back.
+   */
+  suspend() {
+    if (this.manuallyStopped) return;
+    this.stop();
+    this.suspended = true;
+    this.connectionState = 'suspended';
+  }
+
+  async resume() {
+    if (!this.suspended) return;
+    this.suspended = false;
+    await this.start();
   }
 
   setHidden(hidden: boolean) {

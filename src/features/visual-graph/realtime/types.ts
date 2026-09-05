@@ -34,7 +34,15 @@ export type TopologyRuntimeSnapshot = {
   edges: Readonly<Record<string, EdgeRuntimeState>>;
 };
 
-export type RealtimeConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+export type RealtimeConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  // Released deliberately, not lost. Kept apart from `disconnected` so the
+  // interface can say which happened.
+  | 'suspended'
+  | 'disconnected'
+  | 'error';
 
 export type RealtimeDiagnostics = {
   received: number;

@@ -23,6 +23,7 @@ export class ChatController {
   private unsubscribeMessage: (() => void) | null = null;
   private unsubscribeConnection: (() => void) | null = null;
   private manuallyStopped = true;
+  private suspended = false;
   private hidden = false;
   private reconnectAttempt = 0;
   private connectionState: ChatConnectionState = 'idle';
@@ -38,6 +39,7 @@ export class ChatController {
   async start() {
     if (!this.manuallyStopped) return;
     this.manuallyStopped = false;
+    this.suspended = false;
     this.unsubscribeMessage = this.options.transport.subscribe((message) => this.options.store.enqueue(message));
     this.unsubscribeConnection = this.options.transport.subscribeConnection((state) => this.handleConnection(state));
     this.startFlushTimer();
@@ -53,6 +55,26 @@ export class ChatController {
     this.unsubscribeConnection = null;
     this.options.transport.disconnect();
     this.connectionState = 'disconnected';
+  }
+
+  /**
+   * Releases the connection without calling it a failure.
+   *
+   * `stop()` would do the same work, but it lands on `disconnected` — the state
+   * that means something broke. Idle release is not a fault and must not read
+   * as one, so it has its own state and its own way back.
+   */
+  suspend() {
+    if (this.manuallyStopped) return;
+    this.stop();
+    this.suspended = true;
+    this.connectionState = 'suspended';
+  }
+
+  async resume() {
+    if (!this.suspended) return;
+    this.suspended = false;
+    await this.start();
   }
 
   setHidden(hidden: boolean) {
