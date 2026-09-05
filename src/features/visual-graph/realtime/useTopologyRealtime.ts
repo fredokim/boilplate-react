@@ -1,3 +1,4 @@
+import { serverWakeGate } from '@core/api/serverWake';
 import { watchForIdle } from '@core/realtime/idleSuspension';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { GraphDocument, GraphMetadata } from '../model/graph';
@@ -27,7 +28,14 @@ export function useTopologyRealtime<
     [graph],
   );
   const controller = useMemo(
-    () => new TopologyRealtimeController({ topologyId, transport, store, loadSnapshot }),
+    () =>
+      new TopologyRealtimeController({
+        topologyId,
+        transport,
+        store,
+        loadSnapshot,
+        waitForServer: () => serverWakeGate.wait(),
+      }),
     [loadSnapshot, store, topologyId, transport],
   );
   const runtime = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);

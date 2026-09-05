@@ -16,6 +16,10 @@ import { toFailure, type AppFailure } from './failure';
 export type FailureKey =
   | 'offline'
   | 'unreachable'
+  // The host refused to wake a sleeping instance. Distinct from `unreachable`
+  // because it resolves on its own in about a minute, and saying "cannot reach
+  // the server" sends the reader to check a status page for nothing.
+  | 'waking'
   | 'timeout'
   | 'unauthorized'
   | 'forbidden'
@@ -51,6 +55,12 @@ const STATUS: Record<FailureKey, FailureStatus> = {
   unreachable: {
     title: 'Cannot reach the server',
     detail: 'The connection was refused or dropped. The server may be restarting.',
+    tone: 'warning',
+    retryable: true,
+  },
+  waking: {
+    title: 'Server is starting',
+    detail: 'It was idle and is coming back. This usually takes under a minute.',
     tone: 'warning',
     retryable: true,
   },
@@ -118,6 +128,11 @@ function isOffline(): boolean {
 
 /** Translates this repository's `AppFailure` into the shared vocabulary. */
 export function failureKeyOf(failure: AppFailure): FailureKey {
+  // Read before the origin. A refusal to wake a sleeping instance arrives on
+  // the network path but is not a lost connection, and it is the one failure
+  // here that fixes itself if the reader simply waits.
+  if (failure.kind === 'waking') return 'waking';
+
   if (failure.origin === 'network') return isOffline() ? 'offline' : 'unreachable';
 
   switch (failure.kind) {
