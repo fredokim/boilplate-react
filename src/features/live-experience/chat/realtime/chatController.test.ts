@@ -143,4 +143,27 @@ describe('ChatController', () => {
     expect(transport.getConnectionState()).toBe('connected');
     controller.stop();
   });
+
+  /**
+   * The states a reader actually sees.
+   *
+   * The composable used to subscribe to the transport, which knows only what
+   * its socket did. `suspended` is decided here, and `reconnecting` exists only
+   * between a drop and the next attempt, so neither could ever reach the
+   * screen: an idle release read as a fault, and a retry read as a dead link.
+   */
+  it('reports suspended and reconnecting to its own subscribers', async () => {
+    const { controller, transport } = setup();
+    const seen: string[] = [];
+    void controller.start();
+    await vi.advanceTimersByTimeAsync(20);
+    controller.subscribeConnection((state) => seen.push(state));
+
+    transport.simulateDrop();
+    expect(seen).toContain('reconnecting');
+
+    controller.suspend();
+    expect(seen).toContain('suspended');
+    expect(controller.getConnectionState()).toBe('suspended');
+  });
 });

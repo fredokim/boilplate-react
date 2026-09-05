@@ -27,6 +27,7 @@ export class ChatController {
   private hidden = false;
   private reconnectAttempt = 0;
   private connectionState: ChatConnectionState = 'idle';
+  private readonly connectionListeners = new Set<(state: ChatConnectionState) => void>();
 
   constructor(private readonly options: ChatControllerOptions) {
     this.flushIntervalMs = options.flushIntervalMs ?? 120;
@@ -46,7 +47,7 @@ export class ChatController {
     await this.connect();
   }
 
-  stop() {
+  stop(reason: 'closed' | 'suspended' = 'closed') {
     this.manuallyStopped = true;
     this.clearTimers();
     this.unsubscribeMessage?.();
@@ -54,7 +55,10 @@ export class ChatController {
     this.unsubscribeMessage = null;
     this.unsubscribeConnection = null;
     this.options.transport.disconnect();
-    this.connectionState = 'disconnected';
+    // Set once, after the transport subscription is gone, so a deliberate
+    // release is not preceded on screen by the `disconnected` the socket's own
+    // close would otherwise announce.
+    this.setConnectionState(reason === 'suspended' ? 'suspended' : 'disconnected');
   }
 
   /**
@@ -66,9 +70,8 @@ export class ChatController {
    */
   suspend() {
     if (this.manuallyStopped) return;
-    this.stop();
+    this.stop('suspended');
     this.suspended = true;
-    this.connectionState = 'suspended';
   }
 
   async resume() {
@@ -87,6 +90,26 @@ export class ChatController {
     return this.connectionState;
   }
 
+  /**
+   * The connection state a reader should see.
+   *
+   * Subscribing to the transport instead loses everything the controller knows
+   * on its own: `suspended`, which the controller decides, and `reconnecting`,
+   * which only exists between a drop and the next attempt. A transport that
+   * reports only what its socket did can say neither, so both states were
+   * unreachable from the interface even though the vocabulary named them.
+   */
+  subscribeConnection(listener: (state: ChatConnectionState) => void): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
+  }
+
+  private setConnectionState(state: ChatConnectionState) {
+    if (this.connectionState === state) return;
+    this.connectionState = state;
+    this.connectionListeners.forEach((listener) => listener(state));
+  }
+
   private async connect() {
     try {
       await this.options.transport.connect(this.options.roomId);
@@ -97,7 +120,7 @@ export class ChatController {
 
   private handleConnection(state: ChatConnectionState) {
     const wasConnected = this.connectionState === 'connected';
-    this.connectionState = state;
+    this.setConnectionState(state);
 
     if (state === 'connected') {
       this.clearReconnectTimer();
@@ -110,7 +133,7 @@ export class ChatController {
 
   private scheduleReconnect() {
     if (this.manuallyStopped || this.reconnectTimer) return;
-    this.connectionState = 'reconnecting';
+    this.setConnectionState('reconnecting');
     const exponential = Math.min(this.reconnectMaxMs, this.reconnectBaseMs * 2 ** this.reconnectAttempt);
     const delay = Math.round(exponential * (0.8 + this.random() * 0.4));
     this.reconnectAttempt += 1;

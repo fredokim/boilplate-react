@@ -31,17 +31,21 @@ export function useTopologyRealtime<
     [loadSnapshot, store, topologyId, transport],
   );
   const runtime = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const [connectionState, setConnectionState] = useState(transport.getConnectionState());
+  // The controller, not the transport. The transport reports only what its
+  // socket did, so it can never say `suspended` (the controller decides that)
+  // or `reconnecting` (which exists only between a drop and the next attempt).
+  // Reading it here is what made an idle release show up as a failure.
+  const [connectionState, setConnectionState] = useState(controller.getConnectionState());
   const [now, setNow] = useState(0);
 
   useEffect(() => {
     void controller.start();
-    const unsubscribe = transport.subscribeConnection(setConnectionState);
+    const unsubscribe = controller.subscribeConnection(setConnectionState);
     return () => {
       unsubscribe();
       controller.stop();
     };
-  }, [controller, transport]);
+  }, [controller]);
 
   useEffect(() => store.setMonitoredNode(selectedNodeId), [selectedNodeId, store]);
 

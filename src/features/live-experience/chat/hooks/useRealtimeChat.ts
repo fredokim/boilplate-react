@@ -18,16 +18,20 @@ export function useRealtimeChat({ roomId, store: storeOptions, transport }: UseR
   );
 
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const [connectionState, setConnectionState] = useState<ChatConnectionState>(transport.getConnectionState());
+  // The controller, not the transport. The transport reports only what its
+  // socket did, so it can never say `suspended` (the controller decides that)
+  // or `reconnecting` (which exists only between a drop and the next attempt).
+  // Reading it here is what made an idle release show up as a failure.
+  const [connectionState, setConnectionState] = useState<ChatConnectionState>(controller.getConnectionState());
 
   useEffect(() => {
     void controller.start();
-    const unsubscribe = transport.subscribeConnection(setConnectionState);
+    const unsubscribe = controller.subscribeConnection(setConnectionState);
     return () => {
       unsubscribe();
       controller.stop();
     };
-  }, [controller, transport]);
+  }, [controller]);
 
   useEffect(() => {
     const onVisibility = () => controller.setHidden(document.hidden);
