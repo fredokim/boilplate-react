@@ -1,5 +1,6 @@
 import { requestDto } from '@core/api/apiClient';
 import { ChatHistoryDto, ChatMessageResponseDto } from './serverChat.dto';
+import { parseServerChatFrame } from './serverChatFrame';
 
 /**
  * Server-backed chat, alongside the mock transport rather than replacing it.
@@ -151,39 +152,21 @@ export class ServerChatTransport {
   }
 
   private handleMessage(data: unknown): void {
-    if (typeof data !== 'string') return;
+    const frame = parseServerChatFrame(data);
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      // One malformed frame is not a reason to tear down a working stream.
-      return;
-    }
-
-    if (typeof parsed !== 'object' || parsed === null) return;
-
-    const message = parsed as { type?: string; message?: ServerChatMessage; messageId?: string; sequence?: number };
-
-    if (message.type === 'message' && message.message) {
-      // Bound before the loop so the narrowing survives into the closure.
-      const received = message.message;
+    if (frame.kind === 'message') {
+      const received = frame.message;
       this.eventListeners.forEach((listener) => listener({ kind: 'message', message: received }));
       return;
     }
 
-    /**
-     * A tombstone rather than a silent removal: clients that already received the
-     * message need to be told to drop it, and that is what makes them converge
-     * without refetching history.
-     */
-    if (message.type === 'deleted' && message.messageId !== undefined) {
-      const tombstone = { kind: 'deleted' as const, messageId: message.messageId, sequence: message.sequence ?? 0 };
+    if (frame.kind === 'deleted') {
+      const tombstone = { kind: 'deleted' as const, messageId: frame.messageId, sequence: frame.sequence };
       this.eventListeners.forEach((listener) => listener(tombstone));
       return;
     }
 
-    if (message.type === 'error') this.setState('error');
+    if (frame.kind === 'error') this.setState('error');
   }
 
   private socketUrl(): string {
