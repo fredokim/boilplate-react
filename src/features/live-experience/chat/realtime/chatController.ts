@@ -56,6 +56,12 @@ export class ChatController {
     if (!this.manuallyStopped) return;
     this.manuallyStopped = false;
     this.suspended = false;
+    // A fresh episode. Having connected an hour ago says nothing about
+    // whether the server is up now -- and a resume after a long absence is the
+    // likeliest moment for it to be asleep, which is when the cold cadence
+    // matters most.
+    this.hasConnected = false;
+    this.reconnectAttempt = 0;
     this.unsubscribeMessage = this.options.transport.subscribe((message) => this.options.store.enqueue(message));
     this.unsubscribeConnection = this.options.transport.subscribeConnection((state) => this.handleConnection(state));
     this.startFlushTimer();

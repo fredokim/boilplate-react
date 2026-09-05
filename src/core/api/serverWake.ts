@@ -62,7 +62,14 @@ export class ServerWakeGate {
 
   private async run(): Promise<void> {
     for (let attempt = 0; attempt < this.maxAttempts; attempt += 1) {
-      if (await this.check()) return;
+      // A probe that throws must not reject every request waiting on it. The
+      // only thing a failed check tells us is that the server is not up yet.
+      try {
+        if (await this.check()) return;
+      } catch {
+        // Still asleep, as far as anyone waiting is concerned.
+      }
+
       await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
     }
   }

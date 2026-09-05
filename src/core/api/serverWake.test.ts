@@ -72,6 +72,33 @@ describe('ServerWakeGate', () => {
     expect(released).toBe(true);
     expect(gate.isWaking).toBe(false);
   });
+
+  /** Every request in the app waits on this promise. It must not reject them. */
+  it('treats a probe that throws as a server still asleep', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const gate = new ServerWakeGate(async () => {
+      calls += 1;
+      if (calls < 3) throw new Error('connection refused');
+      return true;
+    }, 1_000);
+    let rejected = false;
+    let released = false;
+
+    gate.reportAsleep();
+    void gate.wait().then(
+      () => {
+        released = true;
+      },
+      () => {
+        rejected = true;
+      },
+    );
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(rejected).toBe(false);
+    expect(released).toBe(true);
+  });
 });
 
 describe('the API client on a sleeping server', () => {

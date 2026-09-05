@@ -110,6 +110,47 @@ describe('ChatController', () => {
     controller.stop();
   });
 
+
+  /**
+   * The case the cold backoff is actually for.
+   *
+   * A tab is abandoned, the socket is released after a minute, and the reader
+   * comes back an hour later -- by which time a free instance has certainly
+   * gone to sleep. If having connected once, long ago, still counted, the
+   * resume would retry at the warm cadence and burst at a sleeping server: the
+   * exact thing this exists to prevent, in the likeliest situation for it.
+   */
+  it('treats a resume after a long absence as a cold start', async () => {
+    let asleep = false;
+    const attempt = vi.fn(() => (asleep ? Promise.reject(new Error('asleep')) : Promise.resolve()));
+    const controller = new ChatController({
+      roomId: 'room',
+      transport: new MockChatTransport({ handshakeMs: 10, messagesPerSecond: 0 }),
+      store: new ChatStore(),
+      reconnectBaseMs: 1_000,
+      coldReconnectBaseMs: 8_000,
+      random: () => 0.5,
+      waitForServer: attempt,
+    });
+
+    void controller.start();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(controller.getConnectionState()).toBe('connected');
+
+    controller.suspend();
+    asleep = true;
+    attempt.mockClear();
+    void controller.resume();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    // The warm base would have tried again inside this window.
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(attempt).toHaveBeenCalledTimes(1);
+
+    controller.stop();
+  });
+
   it('connects and then applies buffered messages on the flush tick', async () => {
     const { controller, store, transport } = setup();
     void controller.start();
