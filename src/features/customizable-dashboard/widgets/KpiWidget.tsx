@@ -16,7 +16,7 @@ export const KpiWidget = memo(function KpiWidget({ widget }: KpiWidgetProps) {
   return (
     <div className="flex h-full flex-col">
       <p className="m-0 text-sm font-semibold text-muted">{widget.config.title}</p>
-      <WidgetDataBoundary error={query.error} isEmpty={isEmpty} isPending={query.isPending}>
+      <WidgetDataBoundary error={query.error} onRetry={() => void query.refetch()} isEmpty={isEmpty} isPending={query.isPending}>
         <div className="mt-auto">
           <p className="m-0 text-xs font-semibold text-muted">{query.data?.label}</p>
           <p className="mb-0 mt-1 text-3xl font-black text-ink">{query.data?.value?.toLocaleString()}</p>

@@ -31,7 +31,7 @@ export const TableWidget = memo(function TableWidget({ widget }: TableWidgetProp
   return (
     <div className="flex h-full flex-col">
       <p className="m-0 text-sm font-bold text-ink">{widget.config.title}</p>
-      <WidgetDataBoundary error={query.error} isEmpty={rows.length === 0} isPending={query.isPending}>
+      <WidgetDataBoundary error={query.error} onRetry={() => void query.refetch()} isEmpty={rows.length === 0} isPending={query.isPending}>
         <div className="mt-3">
           <div className="dashboard-virtual-table__header text-xs text-muted">
             {query.data?.columns.map((column) => <strong key={column.key}>{column.label}</strong>)}

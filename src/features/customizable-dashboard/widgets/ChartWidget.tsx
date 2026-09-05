@@ -23,7 +23,7 @@ export const ChartWidget = memo(function ChartWidget({ widget }: ChartWidgetProp
   return (
     <div className="flex h-full flex-col">
       <p className="m-0 text-sm font-bold text-ink">{widget.config.title}</p>
-      <WidgetDataBoundary error={query.error} isEmpty={points.length === 0} isPending={query.isPending}>
+      <WidgetDataBoundary error={query.error} onRetry={() => void query.refetch()} isEmpty={points.length === 0} isPending={query.isPending}>
         <div className="dashboard-chart mt-3 min-h-0 flex-1" aria-label={`${widget.config.title} ${widget.config.chartType} chart`}>
           <XYChart
             height={210}

@@ -90,11 +90,14 @@ describe('dashboard data widgets', () => {
     expect(screen.getByText('Loading widget data…')).toBeInTheDocument();
   });
 
-  it('shows an error state when the data request fails', async () => {
+  it('names the failure rather than calling everything unavailable', async () => {
+    // A 503. Every failure used to render the same four words; what the reader
+    // needs to know is which of them this is, and whether waiting helps.
     server.use(...apiScenarios.dashboardDataError);
     renderWidgets(<KpiWidget widget={kpiWidget} />);
 
-    expect(await screen.findByText('Widget data unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Server error')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('shows an empty state when the data source has no KPI value', async () => {

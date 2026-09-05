@@ -59,14 +59,45 @@
   display: grid;
   min-height: 110px;
   flex: 1;
+  gap: 4px;
+  place-content: center;
   place-items: center;
+  padding: 8px;
   color: var(--color-muted);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+}
+
+/**
+ * By tone. A failure the reader can only wait out is not the same as one that
+ * needs somebody told, and painting both red spends the colour that should mean
+ * "this will not fix itself".
+ */
+.widget-data-state--warning {
+  color: #854d0e;
 }
 
 .widget-data-state--error {
   color: #b91c1c;
+}
+
+.widget-data-state__detail {
+  color: var(--color-muted);
+  font-weight: 400;
+  line-height: 1.45;
+  max-width: 34ch;
+}
+
+.widget-data-state__retry {
+  margin-top: 4px;
+  border: 1px solid currentcolor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 10px;
 }
 
 .widget-runtime-error {
