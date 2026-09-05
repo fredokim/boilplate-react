@@ -33,7 +33,7 @@
     "check:all": "npm run check:ci && npm run check:contract",
     "check:contract": "vitest run src/test/contract",
     "dev:server-mode": "cross-env VITE_DATA_MODE=server npm run dev",
-    "contract:sync": "node -e \"require('node:fs').copyFileSync(process.env.SERVER_REPO ? process.env.SERVER_REPO + '/openapi.json' : '../boilplate-server/openapi.json', 'contracts/openapi.json')\"",
+    "contract:sync": "tsx scripts/sync-contract.ts",
     "preperf:lighthouse": "cross-env VITE_DATA_MODE=server npm run build",
     "perf:lighthouse": "npx -y @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs"
   },
