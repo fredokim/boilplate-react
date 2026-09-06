@@ -35,7 +35,8 @@
     "contract:sync": "tsx scripts/sync-contract.ts",
     "preperf:lighthouse": "cross-env VITE_DATA_MODE=server npm run build",
     "perf:lighthouse": "npx -y @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs",
-    "check:env": "tsx scripts/check-env-example.ts"
+    "check:env": "tsx scripts/check-env-example.ts",
+    "release": "tsx scripts/release.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

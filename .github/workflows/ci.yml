@@ -18,40 +18,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # These three are in `check:ci` and were not in this workflow, so the
-      # token gate and the generator gate -- the two things plan items 1 and 2
-      # exist to enforce -- never ran on a pull request. A gate nobody runs is
-      # a gate that does not exist.
-      - run: npm run check:tokens
-      # Fails when a document names an npm script or a repository path that does
-      # not exist. The README described a server directory that had moved to its
-      # own repository for weeks, and nothing noticed.
-      - run: npm run check:docs
-      - run: npm run check:env
-      - run: npm run lint
-      - run: npm run typecheck
-      # The coverage variant runs the same tests and then enforces the
-      # thresholds. Running both would run every test twice for nothing.
-      - run: npm run test:coverage
-      - run: npm run check:automation
-      - run: npm run check:generators
-      - run: npm run check:deps
-      - run: npm run build
-      - run: npm run check:bundle
-      - run: npm run build-storybook
-      # Lighthouse. Accessibility and best-practices are asserted as errors;
-      # performance stays a warning because it is wall-clock timing on a
-      # shared runner. Every assertion used to be a warning, which meant the
-      # run could not fail -- and it was never in this workflow at all, so
-      # nothing noticed that it was auditing a build that refuses to boot.
-      - run: npm run perf:lighthouse
-      # The e2e suite was never wired into CI, and a router bug that left the
-      # first page a user sees completely blank went unnoticed because of it:
-      # every other gate was green throughout. Unit tests render components in
-      # isolation and cannot see a navigation that never settles.
+
+      # A gate needs a browser. Installed before `release`, because the e2e gate
+      # reports itself skipped without one and a skipped gate proves nothing.
       - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
-      - run: npm audit --audit-level=moderate
+
+      # Every gate, from `scripts/release.ts`, which is the same list
+      # `npm run release` runs locally. This used to be fourteen separate steps
+      # here and a thirteen-command `&&` chain in package.json, and the two had
+      # already drifted: `check:tokens`, `check:docs` and `check:generators` were
+      # in the chain and not in this workflow, so the token gate and the
+      # generator gate never ran on a pull request at all.
+      #
+      # The runner groups each gate's output for the log and prints a summary
+      # naming every gate that failed, rather than stopping at the first one.
+      - run: npm run release
+
+      # Lighthouse stays its own step. Accessibility and best-practices are
+      # asserted as errors; performance stays a warning because it is wall-clock
+      # timing on a shared runner, and a gate that fails on runner noise is one
+      # people learn to re-run rather than read.
+      - run: npm run perf:lighthouse
 
   # The frontend's assumptions checked against the backend's published spec.
   contract:
