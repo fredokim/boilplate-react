@@ -1,5 +1,5 @@
 import type { ChatStore } from './chatStore';
-import type { ChatConnectionState, ChatTransport } from './types';
+import type { ChatConnectionState, ChatTransport, Unsubscribe } from './types';
 
 export type ChatControllerOptions = {
   roomId: string;
@@ -120,7 +120,7 @@ export class ChatController {
    * reports only what its socket did can say neither, so both states were
    * unreachable from the interface even though the vocabulary named them.
    */
-  subscribeConnection(listener: (state: ChatConnectionState) => void): () => void {
+  subscribeConnection(listener: (state: ChatConnectionState) => void): Unsubscribe {
     this.connectionListeners.add(listener);
     return () => this.connectionListeners.delete(listener);
   }
