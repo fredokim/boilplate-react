@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs
 import { join, resolve } from 'node:path';
 
 /**
- * Runs each generator and checks what it produced against FEATURE_CONTRACT.md.
+ * Runs each generator and checks what it produced against docs/development/FEATURE_CONTRACT.md.
  *
  * The previous check asserted that four generator *files existed*. It never ran
  * one, and the feature generator was not among the four — so a generator could
@@ -23,7 +23,7 @@ const CAMEL = 'generatorContractProbe';
 
 const featureDir = join(ROOT, 'src', 'features', FEATURE);
 
-/** Made for every feature, per FEATURE_CONTRACT.md. */
+/** Made for every feature, per docs/development/FEATURE_CONTRACT.md. */
 const ALWAYS = [
   `views/${PASCAL}View.tsx`,
   `views/${PASCAL}View.stories.tsx`,
@@ -157,8 +157,8 @@ if (!entryPoint.includes('scripts/generate-feature.ts')) {
 
 if (failures.length > 0) {
   console.error(failures.map((failure) => `- ${failure}`).join('\n'));
-  console.error('\nSee FEATURE_CONTRACT.md for what a generated feature must contain.');
+  console.error('\nSee docs/development/FEATURE_CONTRACT.md for what a generated feature must contain.');
   process.exit(1);
 }
 
-console.log('[generators] Generated features match FEATURE_CONTRACT.md.');
+console.log('[generators] Generated features match docs/development/FEATURE_CONTRACT.md.');

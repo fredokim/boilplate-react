@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
  *
  * The source is `tokens/tokens.json`, shared by all three boilerplates. The
  * values used to live in each repository's own CSS and three of them had
- * quietly drifted apart — see TOKEN_INVENTORY.md. Generating them removes the
+ * quietly drifted apart — see docs/history/TOKEN_INVENTORY.md. Generating them removes the
  * way that happens, rather than correcting the values once.
  *
  * References (`{primitive.color.white}`) are resolved here rather than emitted
