@@ -80,11 +80,15 @@ export class MockChatTransport implements ChatTransport {
     const line = lines[index % lines.length] ?? lines[0];
     return {
       id: `mock-${String(index)}`,
+      sequence: index + 1,
       userId: participant.userId,
       displayName: participant.displayName,
       profileImageUrl: participant.profileImageUrl,
       message: line,
-      timestamp: new Date(Date.now() + index).toISOString(),
+      // The real clock. This used to be `Date.now() + index`, faking a rising
+      // timestamp because the timestamp was the order — which is exactly the
+      // conflation `sequence` exists to avoid.
+      timestamp: new Date().toISOString(),
     };
   }
 
