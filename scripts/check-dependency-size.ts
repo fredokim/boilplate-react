@@ -11,13 +11,22 @@ const frameworkPackages = new Set(['react', 'react-dom']);
 const defaultMaxBytes = 6 * 1024 * 1024;
 const frameworkMaxBytes = 80 * 1024 * 1024;
 
-// DEPENDENCY_STRATEGY.md says an oversized runtime dependency needs a written reason.
-// Raising a cap here is therefore only half of it: the package must also be named in
-// that document, so the exception cannot be granted silently.
+// The strategy document says an oversized runtime dependency needs a written
+// reason. Raising a cap here is therefore only half of it: the package must also
+// be named in that document, so the exception cannot be granted silently.
 const documentedExceptions = new Map<string, number>([['hls.js', 40 * 1024 * 1024]]);
-const strategyDoc = existsSync(join(root, 'DEPENDENCY_STRATEGY.md'))
-  ? readFileSync(join(root, 'DEPENDENCY_STRATEGY.md'), 'utf8')
-  : '';
+
+const strategyPath = join(root, 'docs', 'development', 'DEPENDENCY_STRATEGY.md');
+
+// Loudly, not as an empty string. This used to fall back to '' when the file was
+// missing, so moving the document into `docs/` produced "hls.js has no recorded
+// reason" — an accusation about a dependency, for a problem with a path.
+if (!existsSync(strategyPath)) {
+  console.error(`check:deps — cannot read ${strategyPath}. Every raised cap is checked against it.`);
+  process.exit(1);
+}
+
+const strategyDoc = readFileSync(strategyPath, 'utf8');
 
 const failures: string[] = [];
 
