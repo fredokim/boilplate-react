@@ -22,7 +22,7 @@
     "tokens:build": "tsx scripts/build-tokens.ts",
     "check:tokens": "tsx scripts/check-tokens.ts",
     "check:docs": "tsx scripts/check-docs.ts",
-    "check:ci": "npm run check:tokens && npm run check:docs && npm run lint && npm run typecheck && npm run test && npm run check:ai && npm run check:automation && npm run check:generators && npm run check:deps && npm run build && npm run check:bundle && npm run build-storybook",
+    "check:ci": "npm run check:tokens && npm run check:docs && npm run check:env && npm run lint && npm run typecheck && npm run test && npm run check:ai && npm run check:automation && npm run check:generators && npm run check:deps && npm run build && npm run check:bundle && npm run build-storybook",
     "perf:bundle": "cross-env ANALYZE=true npm run build",
     "generate": "tsx scripts/generate.ts",
     "generate:contract": "tsx scripts/generate-contract.ts",
@@ -35,7 +35,8 @@
     "dev:server-mode": "cross-env VITE_DATA_MODE=server npm run dev",
     "contract:sync": "tsx scripts/sync-contract.ts",
     "preperf:lighthouse": "cross-env VITE_DATA_MODE=server npm run build",
-    "perf:lighthouse": "npx -y @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs"
+    "perf:lighthouse": "npx -y @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs",
+    "check:env": "tsx scripts/check-env-example.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

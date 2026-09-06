@@ -27,6 +27,7 @@ jobs:
       # not exist. The README described a server directory that had moved to its
       # own repository for weeks, and nothing noticed.
       - run: npm run check:docs
+      - run: npm run check:env
       - run: npm run lint
       - run: npm run typecheck
       # The coverage variant runs the same tests and then enforces the
