@@ -28,6 +28,7 @@ const DEFAULT_AVATAR = '/avatars/default.svg';
 function toChatMessage(message: ServerChatMessage): ChatMessage {
   return {
     id: message.id,
+    sequence: message.sequence,
     userId: message.authorId,
     displayName: message.displayName,
     profileImageUrl: DEFAULT_AVATAR,

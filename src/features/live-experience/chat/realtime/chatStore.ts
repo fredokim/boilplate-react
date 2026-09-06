@@ -30,7 +30,10 @@ const emptyDiagnostics = (): ChatDiagnostics => ({
  *
  *  - retention is bounded, because a broadcast runs for hours and nobody scrolls back
  *    thousands of messages;
- *  - ordering is by timestamp, because a message can arrive after a newer one;
+ *  - ordering is by `sequence`, because a message can arrive after a newer one — and
+ *    because `sequence` is the only order the server promises. It used to sort on the
+ *    timestamp, which the server allocates at transaction start while it allocates the
+ *    sequence under a row lock, so the two can disagree;
  *  - a message older than everything retained is dropped rather than inserted where no
  *    one will see it.
  *
@@ -67,6 +70,13 @@ export class ChatStore {
   enqueue(message: ChatMessage) {
     const diagnostics = { ...this.snapshot.diagnostics, received: this.snapshot.diagnostics.received + 1 };
 
+    /**
+     * On `id`, which names the stored message. Not on `sequence` — the server
+     * hands the same message the same id on a replay and a different one is a
+     * different message, so id is the question being asked. Not on
+     * `clientMessageId` either: that names a send attempt, and this client is
+     * receiving.
+     */
     if (this.processedIds.has(message.id)) {
       diagnostics.duplicatesIgnored += 1;
       this.replaceDiagnostics(diagnostics);
@@ -75,7 +85,7 @@ export class ChatStore {
     this.remember(message.id);
 
     const oldestRetained = this.snapshot.messages[0];
-    if (oldestRetained && Date.parse(message.timestamp) < Date.parse(oldestRetained.timestamp)) {
+    if (oldestRetained && message.sequence < oldestRetained.sequence) {
       // It would land above the window the reader can scroll to, so it is not worth keeping.
       diagnostics.droppedTooOld += 1;
       this.replaceDiagnostics(diagnostics);
@@ -99,7 +109,7 @@ export class ChatStore {
     this.pending = [];
 
     let repositioned = 0;
-    const sorted = [...batch].sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp));
+    const sorted = [...batch].sort((left, right) => left.sequence - right.sequence);
     for (let index = 0; index < batch.length; index += 1) {
       if (batch[index] !== sorted[index]) {
         repositioned += 1;
