@@ -50,11 +50,24 @@ function filesUnder(path: string): string[] {
 
 const READ = /(?:import\.meta|process)\.env\.([A-Z_][A-Z0-9_]*)/g;
 
+/**
+ * Comments are not code.
+ *
+ * The server's copy of this check failed on its own first CI run, on a
+ * `process.env.X` written in a docstring to explain what the check looks for.
+ * Nothing here reads a variable from a comment today — the two mentions in
+ * `main.tsx` are `import.meta.env.DEV`, which is exempt anyway — but a comment
+ * naming any other variable would produce a failure about a line of prose.
+ */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
 const used = new Map<string, string>();
 
 for (const source of SOURCES) {
   for (const file of filesUnder(source)) {
-    const contents = readFileSync(file, 'utf8');
+    const contents = withoutComments(readFileSync(file, 'utf8'));
 
     for (const match of contents.matchAll(READ)) {
       const name = match[1];
