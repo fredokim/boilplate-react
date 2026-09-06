@@ -161,6 +161,11 @@ VITE_TOPOLOGY_SOURCE=server npm run dev
 The runtime store, controller, batching, coalescing, and backoff are untouched —
 only the transport and snapshot source are swapped.
 
+The full layer map is in
+[VISUAL_GRAPH.md](docs/architecture/VISUAL_GRAPH.md); how the stream binds to
+React is in
+[REALTIME_INTEGRATION.md](docs/architecture/REALTIME_INTEGRATION.md).
+
 ### Live experience and chat
 
 Broadcast metadata, short-lived playback grants, and a persisted chat with
@@ -176,6 +181,9 @@ VITE_CHAT_SOURCE=server npm run dev
 
 HLS engine selection and live-edge calculation stay on the frontend; the server
 only states `sourceType` and `dvrEnabled`.
+
+Frame validation, reconnect and resume are covered in
+[REALTIME_INTEGRATION.md](docs/architecture/REALTIME_INTEGRATION.md).
 
 ### Health endpoints and the MSW contract
 
@@ -195,23 +203,47 @@ the mock never produces — the mock is always healthy.
 
 `/api/health/live` and `/api/health/ready` are new and have no mock counterpart.
 
-## More Docs
+## Documentation
 
-- `DESIGN_RATIONALE.md`: problem definition, component design method, key decisions, results, and retrospective.
-- `VISUAL_GRAPH.md`: layer map, realtime pipeline, editing session model, and layout/performance strategy for the graph example.
-- `REALTIME_INTEGRATION.md`: how the streaming layer binds to React, and what the adapter must get right.
-- `ARCHITECTURE.md`: boundaries and ownership rules.
-- [`boilplate-server`](https://github.com/fredokim/boilplate-server): the shared backend — setup, request flow, and envelope ownership live in its own README and ARCHITECTURE.
-- `CONTRIBUTING.md`: checklist for new UI/features.
-- `DEPENDENCY_STRATEGY.md`: package replacement and dependency review rules.
-- `AI_DEVELOPMENT_GUIDE.md`: rules for AI-assisted implementation.
-- `AI_WORKFLOW.md`: AI-assisted React workflow and verification gates.
-- `PROMPT_PLAYBOOK.md`: prompts for implementation, review, refactoring, and testing.
-- `CODE_REVIEW_CHECKLIST.md`: review checklist for AI-generated React code.
-- `AI_REFACTORING_CASE_STUDY.md`: React before/after refactoring playbook.
-- `PERFORMANCE_REPORT.md`: route, bundle, dependency, and rendering guardrails.
-- `I18N_STRATEGY.md`: typed dictionary, fallback locale, and formatting strategy.
-- `AI_CHANGELOG.md`: AI-assisted work log and verification notes.
+Everything below is reachable from here, and `npm run check:docs` fails if a
+document stops being.
+
+**Architecture** — what the boundaries are and why
+
+- [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) — boundaries and ownership rules.
+- [DESIGN_RATIONALE.md](docs/architecture/DESIGN_RATIONALE.md) — problem definition, component design method, key decisions, and retrospective.
+- [REALTIME_INTEGRATION.md](docs/architecture/REALTIME_INTEGRATION.md) — how the streaming layer binds to React, and what the adapter must get right.
+- [VISUAL_GRAPH.md](docs/architecture/VISUAL_GRAPH.md) — layer map, realtime pipeline, editing session model, and layout strategy for the graph example.
+
+**API** — the contract with the backend
+
+- [API_CONTRACT.md](docs/api/API_CONTRACT.md) — the response envelope and what owns it.
+- [`boilplate-server`](https://github.com/fredokim/boilplate-server) — the shared backend. Setup, request flow and envelope ownership live in its own README.
+
+**Development** — how to work in here
+
+- [CONTRIBUTING.md](docs/development/CONTRIBUTING.md) — checklist for new UI and features.
+- [FEATURE_CONTRACT.md](docs/development/FEATURE_CONTRACT.md) — what files a feature is made of. `npm run check:generators` enforces it.
+- [CODE_REVIEW_CHECKLIST.md](docs/development/CODE_REVIEW_CHECKLIST.md) — review checklist for AI-generated React code.
+- [DEPENDENCY_STRATEGY.md](docs/development/DEPENDENCY_STRATEGY.md) — package replacement and dependency review rules.
+- [I18N_STRATEGY.md](docs/development/I18N_STRATEGY.md) — typed dictionary, fallback locale, and formatting.
+- [AI_WORKFLOW.md](docs/development/AI_WORKFLOW.md) — where AI is allowed to draft and where the developer decides.
+- [AI_DEVELOPMENT_GUIDE.md](docs/development/AI_DEVELOPMENT_GUIDE.md) — rules for AI-assisted implementation.
+- [PROMPT_PLAYBOOK.md](docs/development/PROMPT_PLAYBOOK.md) — prompts for implementation, review, refactoring, and testing.
+
+**Deployment**
+
+- [DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) — one origin, the proxy, and what the browser must never see.
+
+**History** — records of a past state, kept rather than maintained
+
+[`docs/history/`](docs/history) holds the AI changelog, the refactoring case
+study, the performance report, the token inventory, and the planning prompts.
+They describe the repository as it was, so `check:docs` does not hold them to
+today's layout.
+
+**Ecosystem** — [BOILPLATE](https://github.com/fredokim/BOILPLATE) introduces all
+four repositories and holds the decisions that span them.
 
 ## Design tokens
 
@@ -244,8 +276,9 @@ npm run generate:feature -- billing-report          # view, story, test, contain
 npm run generate:feature -- billing-report --api    # ...plus api module, DTO, and query hook
 ```
 
-`FEATURE_CONTRACT.md` records what a generated feature contains and why, derived
-from the features that already exist rather than invented.
+[FEATURE_CONTRACT.md](docs/development/FEATURE_CONTRACT.md) records what a
+generated feature contains and why, derived from the features that already exist
+rather than invented.
 
 The api module is behind `--api` because a generated one calls a URL derived
 from the feature name, and `npm run check:contract` reads those URLs and

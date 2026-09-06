@@ -33,7 +33,6 @@ jobs:
       # The coverage variant runs the same tests and then enforces the
       # thresholds. Running both would run every test twice for nothing.
       - run: npm run test:coverage
-      - run: npm run check:ai
       - run: npm run check:automation
       - run: npm run check:generators
       - run: npm run check:deps

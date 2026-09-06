@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
- * Creates a feature that matches FEATURE_CONTRACT.md.
+ * Creates a feature that matches docs/development/FEATURE_CONTRACT.md.
  *
  * It used to create three files and two empty directories, and the result was
  * unreachable: the router collects `@features/** /routes/*.route.tsx` and this

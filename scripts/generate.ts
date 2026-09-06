@@ -42,7 +42,7 @@ if (kind === 'layout' || kind === 'page' || kind === 'form') {
 // Delegated, not inlined. This branch used to hold its own copy of feature
 // generation that made two files and three empty directories, so
 // `generate -- feature x` and `generate:feature -- x` produced different
-// results and only one of them followed FEATURE_CONTRACT.md.
+// results and only one of them followed docs/development/FEATURE_CONTRACT.md.
 if (kind === 'feature') {
   const result = spawnSync('tsx', ['scripts/generate-feature.ts', rawName, ...process.argv.slice(4)], {
     stdio: 'inherit',

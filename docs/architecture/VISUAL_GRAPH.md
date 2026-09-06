@@ -173,5 +173,6 @@ resolution, recorded here because the file layout would otherwise look arbitrary
   from an arbitrary `GraphDocument` rather than a fixed four-node demo.
 - **Moved** node status out of `NetworkNodeMetadata`. Runtime status streams; it is not static topology data.
 
-Verified after merge: `typecheck`, `lint`, `test` (21 files, 99 tests), `check:ai`, `check:automation`,
+Verified after merge: `typecheck`, `lint`, `test` (21 files, 99 tests), `check:ai` (since removed — it
+ asserted documents contained particular phrases), `check:automation`,
 `check:deps`, `build`, and `check:bundle` all pass.
