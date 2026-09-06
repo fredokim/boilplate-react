@@ -2,6 +2,7 @@ import { requestDto } from '@core/api/apiClient';
 import { TopologySnapshotDto } from './topologySnapshot.dto';
 import type { RealtimeConnectionState, TopologyRealtimeEvent, TopologyRuntimeSnapshot } from './types';
 import type { TopologyRealtimeTransport, Unsubscribe } from './transport';
+import { parseServerTopologyFrame } from './serverTopologyFrame';
 
 /**
  * The real server transport, alongside the mock one rather than replacing it.
@@ -30,14 +31,6 @@ export async function fetchTopologySnapshot(graphId: string): Promise<TopologyRu
     edges: response.edges as TopologyRuntimeSnapshot['edges'],
   };
 }
-
-type ServerMessage =
-  | { type: 'ready'; connectionId: string }
-  | { type: 'subscribed'; graphId: string; replayed: number }
-  | { type: 'resync-required'; graphId: string; reason: string }
-  | { type: 'event'; event: TopologyRealtimeEvent }
-  | { type: 'heartbeat' | 'pong'; at: number }
-  | { type: 'error'; code: string; message: string };
 
 export type ServerTransportOptions = {
   /** Reads the current access token. The socket URL is built per connect, so a refreshed token is picked up. */
@@ -117,31 +110,19 @@ export class ServerTopologyTransport implements TopologyRealtimeTransport {
   }
 
   private handleMessage(data: unknown): void {
-    const message = parseMessage(data);
+    const frame = parseServerTopologyFrame(data);
 
-    // An unparseable frame is dropped rather than treated as a connection error:
-    // one malformed message is not a reason to tear down a working stream.
-    if (!message) return;
-
-    switch (message.type) {
-      case 'event':
-        this.eventListeners.forEach((listener) => listener(message.event));
-        return;
-
-      case 'resync-required':
-        // Not an error state. The connection is fine; the client's position in
-        // the stream is not, and only a fresh snapshot fixes that.
-        this.options.onResyncRequired(message.reason);
-        return;
-
-      case 'error':
-        this.setState('error');
-        return;
-
-      default:
-        // ready, subscribed, heartbeat, pong — nothing for the store to do.
-        return;
+    if (frame.kind === 'event') {
+      this.eventListeners.forEach((listener) => listener(frame.event));
+      return;
     }
+
+    if (frame.kind === 'resync-required') {
+      this.options.onResyncRequired(frame.reason);
+      return;
+    }
+
+    if (frame.kind === 'error') this.setState('error');
   }
 
   private socketUrl(): string {
@@ -173,16 +154,4 @@ function defaultBaseUrl(): string {
   return `${protocol}//${window.location.host}/api/topology`;
 }
 
-function parseMessage(data: unknown): ServerMessage | null {
-  if (typeof data !== 'string') return null;
 
-  try {
-    const parsed: unknown = JSON.parse(data);
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    if (typeof (parsed as { type?: unknown }).type !== 'string') return null;
-
-    return parsed as ServerMessage;
-  } catch {
-    return null;
-  }
-}
